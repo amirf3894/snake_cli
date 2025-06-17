@@ -1,3 +1,5 @@
+use snake::game::init;
+use std::io::{Write, stdout};
 fn main() {
-    println!("Hello, world!");
+    init::start();
 }

@@ -28,12 +28,21 @@ impl SnakeBody {
         }
         self.movement_adder = new_movement_adder;
     }
-    fn move_toward(&mut self) {
-        self.pieces.remove(self.len);
+    pub fn move_toward(&mut self) -> (u16, u16) {
+        let &head = self.pieces.get(self.len - 1).unwrap();
+        let removed_tail = self.pieces.remove(0);
+        self.pieces.push((
+            (head.0 as i16 + self.movement_adder.0).try_into().unwrap(),
+            (head.1 as i16 + self.movement_adder.1).try_into().unwrap(),
+        ));
+        removed_tail
+    }
+    fn eat_food(&mut self) {
         let &head = self.pieces.last().unwrap();
         self.pieces.push((
             (head.0 as i16 + self.movement_adder.0).try_into().unwrap(),
             (head.1 as i16 + self.movement_adder.1).try_into().unwrap(),
         ));
+        self.len += 1;
     }
 }

@@ -1,5 +1,5 @@
-use snake::game::init;
+use snake::game::snake;
 use std::io::{Write, stdout};
 fn main() {
-    init::start();
+    snake::main_snake();
 }

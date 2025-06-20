@@ -4,12 +4,13 @@ use crossterm::{
     event::{self, Event::Key, KeyCode, KeyEvent, read},
     execute,
     terminal::{
-        self, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+        self, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode, size,
     },
 };
 
 use std::{
-    io::{self, Write, stdout},
+    fmt::format,
+    io::{self, Stdout, Write, stdout},
     thread::sleep,
     time::Duration,
 };
@@ -17,7 +18,8 @@ use std::{
 pub fn start() -> io::Result<()> {
     enable_raw_mode()?;
     let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen, terminal::SetSize(256, 256))?;
+    execute!(stdout, EnterAlternateScreen, terminal::SetSize(5, 5))?;
+    print_wall(&mut stdout)?;
     let terminal_size = terminal::size()?;
     let mut cursor_position = (terminal_size.0 / 2, terminal_size.1 / 2);
     execute!(stdout, cursor::MoveTo(cursor_position.0, cursor_position.1))?;
@@ -50,5 +52,21 @@ pub fn end() -> io::Result<()> {
     let mut stdout = stdout();
     execute!(stdout, LeaveAlternateScreen)?;
     disable_raw_mode()?;
+    Ok(())
+}
+
+pub fn print_wall(stdout: &mut Stdout) -> io::Result<()> {
+    let terminal_size = size()?;
+    execute!(stdout, MoveTo(0, 0)).unwrap();
+    let horizen = "#".repeat(terminal_size.0 as usize);
+    write!(stdout, "{horizen}").unwrap();
+    (1..=terminal_size.1).for_each(|y| {
+        execute!(stdout, MoveTo(0, y)).unwrap();
+        write!(stdout, "#").unwrap();
+        execute!(stdout, MoveTo(terminal_size.0, y)).unwrap();
+        write!(stdout, "#").unwrap();
+    });
+    execute!(stdout, MoveTo(0, terminal_size.1))?;
+    write!(stdout, "{horizen}")?;
     Ok(())
 }

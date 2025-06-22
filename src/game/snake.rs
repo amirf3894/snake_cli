@@ -1,6 +1,6 @@
 use crate::game::{
     init::start,
-    model::{self, SnakeBody},
+    model::{self, CommandKeys, Direction, SnakeBody},
     snake,
 };
 use crossterm::{
@@ -11,6 +11,7 @@ use crossterm::{
 };
 use std::{
     io::{Stdout, Write},
+    rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
     vec,
@@ -25,30 +26,22 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         pieces: vec![(terminal_size.0 / 2, terminal_size.1 / 2)],
         movement_adder: (1, 0),
     }));
+    let command = Arc::new(Mutex::new(CommandKeys::None));
     loop {
-        let snake_for_move = snake.clone();
-        tokio::spawn(change_direction(snake.clone()));
-        show_snake(&mut stdout, snake_for_move);
+        tokio::spawn(read_key_to_command(command.clone()));
+        if let CommandKeys::Directions(ref direction) = *command.lock().unwrap() {
+            snake.clone().lock().unwrap().change_direction(direction);
+        }
+        show_snake(&mut stdout, snake.clone());
+        if let CommandKeys::EatFood = *command.lock().unwrap() {
+            snake.clone().lock().unwrap().eat_food();
+        }
         sleep(Duration::from_millis(200)).await;
     }
     Ok(())
 }
-async fn change_direction(snake: Arc<Mutex<SnakeBody>>) {
-    loop {
-        let key_event = spawn_blocking(|| read().unwrap()).await.unwrap();
-        let direction = match key_event.as_key_press_event().unwrap().code {
-            event::KeyCode::Up => model::Direction::Up,
-            event::KeyCode::Down => model::Direction::Down,
-            event::KeyCode::Right => model::Direction::Right,
-            event::KeyCode::Left => model::Direction::Left,
-            event::KeyCode::Enter => {
-                snake.lock().unwrap().eat_food();
-                continue;
-            }
-            _ => continue,
-        };
-        snake.lock().unwrap().change_direction(direction);
-    }
+fn change_direction(snake: Arc<Mutex<SnakeBody>>, direction: &Direction) {
+    snake.lock().unwrap().change_direction(direction);
 }
 fn show_snake(stdout: &mut Stdout, snake: Arc<Mutex<SnakeBody>>) {
     let (newhead, removed_tail) = snake.lock().unwrap().move_toward();
@@ -58,4 +51,22 @@ fn show_snake(stdout: &mut Stdout, snake: Arc<Mutex<SnakeBody>>) {
     write!(stdout, "#");
     execute!(stdout, removed_tail);
     write!(stdout, " ");
+}
+async fn eat_food(snake: Arc<Mutex<SnakeBody>>) {
+    snake.lock().unwrap().eat_food();
+}
+async fn read_key_to_command(command: Arc<Mutex<CommandKeys>>) {
+    *command.lock().unwrap() = CommandKeys::None;
+    loop {
+        let key_event = spawn_blocking(|| read().unwrap()).await.unwrap();
+        let new_command = match key_event.as_key_press_event().unwrap().code {
+            event::KeyCode::Up => CommandKeys::Directions(Direction::Up),
+            event::KeyCode::Down => CommandKeys::Directions(Direction::Down),
+            event::KeyCode::Right => CommandKeys::Directions(Direction::Right),
+            event::KeyCode::Left => CommandKeys::Directions(Direction::Left),
+            event::KeyCode::Enter => CommandKeys::EatFood,
+            _ => continue,
+        };
+        *command.lock().unwrap() = new_command;
+    }
 }

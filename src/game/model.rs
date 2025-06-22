@@ -14,10 +14,18 @@ pub enum Direction {
     Left,
     Right,
 }
+#[derive(Debug)]
+pub enum CommandKeys {
+    Directions(Direction),
+    EatFood,
+    Invalid,
+    Exit,
+    None,
+}
 use crossterm::event::read;
 use tokio;
 impl SnakeBody {
-    pub fn change_direction(&mut self, direction: Direction) {
+    pub fn change_direction(&mut self, direction: &Direction) {
         let new_movement_adder = match direction {
             Direction::Up => (0, -1),
             Direction::Down => (0, 1),

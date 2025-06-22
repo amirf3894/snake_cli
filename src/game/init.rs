@@ -48,7 +48,7 @@ pub fn end() -> io::Result<()> {
     let mut stdout = stdout();
     execute!(stdout, LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    exit(1);
+    exit(0);
 }
 
 pub fn print_wall(stdout: &mut Stdout) -> io::Result<()> {

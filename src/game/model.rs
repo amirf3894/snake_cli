@@ -29,7 +29,6 @@ impl SnakeBody {
         {
             return;
         }
-        println!("{:?}", direction);
         self.movement_adder = new_movement_adder;
     }
     pub fn move_toward(&mut self) -> (u16, u16) {

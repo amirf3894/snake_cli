@@ -22,8 +22,7 @@ pub enum CommandKeys {
     Exit,
     None,
 }
-use crossterm::event::read;
-use tokio;
+
 impl SnakeBody {
     pub fn change_direction(&mut self, direction: &Direction) {
         let new_movement_adder = match direction {

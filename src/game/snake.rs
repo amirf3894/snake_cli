@@ -1,17 +1,15 @@
 use crate::game::{
     init::start,
-    model::{self, CommandKeys, Direction, SnakeBody},
-    snake,
+    model::{CommandKeys, Direction, SnakeBody},
 };
 use crossterm::{
     cursor::MoveTo,
     event::{self, read},
     execute,
-    terminal::{self, size},
+    terminal::size,
 };
 use std::{
     io::{Stdout, Write},
-    rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
     vec,
@@ -32,29 +30,28 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         if let CommandKeys::Directions(ref direction) = *command.lock().unwrap() {
             snake.clone().lock().unwrap().change_direction(direction);
         }
-        show_snake(&mut stdout, snake.clone());
+        show_snake(&mut stdout, snake.clone())?;
         if let CommandKeys::EatFood = *command.lock().unwrap() {
             snake.clone().lock().unwrap().eat_food();
         }
         sleep(Duration::from_millis(200)).await;
     }
-    Ok(())
 }
-fn change_direction(snake: Arc<Mutex<SnakeBody>>, direction: &Direction) {
-    snake.lock().unwrap().change_direction(direction);
-}
-fn show_snake(stdout: &mut Stdout, snake: Arc<Mutex<SnakeBody>>) {
+
+fn show_snake(
+    stdout: &mut Stdout,
+    snake: Arc<Mutex<SnakeBody>>,
+) -> Result<(), Box<dyn (std::error::Error)>> {
     let (newhead, removed_tail) = snake.lock().unwrap().move_toward();
     let newhead = MoveTo(newhead.0, newhead.1);
     let removed_tail = MoveTo(removed_tail.0, removed_tail.1);
-    execute!(stdout, newhead);
-    write!(stdout, "#");
-    execute!(stdout, removed_tail);
-    write!(stdout, " ");
+    execute!(stdout, newhead)?;
+    write!(stdout, "#")?;
+    execute!(stdout, removed_tail)?;
+    write!(stdout, " ")?;
+    Ok(())
 }
-async fn eat_food(snake: Arc<Mutex<SnakeBody>>) {
-    snake.lock().unwrap().eat_food();
-}
+
 async fn read_key_to_command(command: Arc<Mutex<CommandKeys>>) {
     *command.lock().unwrap() = CommandKeys::None;
     loop {

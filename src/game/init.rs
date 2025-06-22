@@ -1,17 +1,12 @@
 use crossterm::{
-    cursor::{self, MoveTo},
-    event::{KeyCode, read},
+    cursor::MoveTo,
     execute,
     terminal::{
         self, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode, size,
     },
 };
 
-use std::{
-    io::{self, Stdout, Write, stdout},
-    thread::sleep,
-    time::Duration,
-};
+use std::io::{self, Stdout, Write, stdout};
 
 pub fn start() -> io::Result<Stdout> {
     enable_raw_mode()?;

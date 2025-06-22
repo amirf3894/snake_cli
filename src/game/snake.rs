@@ -1,12 +1,12 @@
 use crate::game::{
-    init::start,
+    init::{end, start},
     model::{CommandKeys, Direction, SnakeBody},
 };
 use crossterm::{
     cursor::MoveTo,
     event::{self, read},
     execute,
-    terminal::size,
+    terminal::{size},
 };
 use std::{
     io::{Stdout, Write},
@@ -34,6 +34,9 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         if let CommandKeys::EatFood = *command.lock().unwrap() {
             snake.clone().lock().unwrap().eat_food();
         }
+        if let CommandKeys::End = *command.lock().unwrap() {
+            end()?;
+        }
         sleep(Duration::from_millis(200)).await;
     }
 }
@@ -42,11 +45,14 @@ fn show_snake(
     stdout: &mut Stdout,
     snake: Arc<Mutex<SnakeBody>>,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
-    let (newhead, removed_tail) = snake.lock().unwrap().move_toward();
-    let newhead = MoveTo(newhead.0, newhead.1);
+    let (new_head, removed_tail, previous_head) = snake.lock().unwrap().move_toward();
+    let new_head = MoveTo(new_head.0, new_head.1);
     let removed_tail = MoveTo(removed_tail.0, removed_tail.1);
-    execute!(stdout, newhead)?;
-    write!(stdout, "#")?;
+    let previous_head = MoveTo(previous_head.0, previous_head.1);
+    execute!(stdout, new_head)?;
+    write!(stdout, "X")?;
+    execute!(stdout, previous_head)?;
+    write!(stdout, "O")?;
     execute!(stdout, removed_tail)?;
     write!(stdout, " ")?;
     Ok(())
@@ -62,6 +68,7 @@ async fn read_key_to_command(command: Arc<Mutex<CommandKeys>>) {
             event::KeyCode::Right => CommandKeys::Directions(Direction::Right),
             event::KeyCode::Left => CommandKeys::Directions(Direction::Left),
             event::KeyCode::Enter => CommandKeys::EatFood,
+            event::KeyCode::Esc => CommandKeys::End,
             _ => continue,
         };
         *command.lock().unwrap() = new_command;

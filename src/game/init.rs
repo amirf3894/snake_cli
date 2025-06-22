@@ -6,7 +6,10 @@ use crossterm::{
     },
 };
 
-use std::io::{self, Stdout, Write, stdout};
+use std::{
+    io::{self, Stdout, Write, stdout},
+    process::exit,
+};
 
 pub fn start() -> io::Result<Stdout> {
     enable_raw_mode()?;
@@ -45,7 +48,7 @@ pub fn end() -> io::Result<()> {
     let mut stdout = stdout();
     execute!(stdout, LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    Ok(())
+    exit(1);
 }
 
 pub fn print_wall(stdout: &mut Stdout) -> io::Result<()> {

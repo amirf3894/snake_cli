@@ -20,6 +20,7 @@ pub enum CommandKeys {
     EatFood,
     Invalid,
     Exit,
+    End,
     None,
 }
 
@@ -38,15 +39,19 @@ impl SnakeBody {
         }
         self.movement_adder = new_movement_adder;
     }
-    pub fn move_toward(&mut self) -> ((u16, u16), (u16, u16)) {
-        let &head = self.pieces.get(self.len - 1).unwrap();
+    pub fn move_toward(&mut self) -> ((u16, u16), (u16, u16), (u16, u16)) {
+        let &previous_head = self.pieces.get(self.len - 1).unwrap();
         let removed_tail = self.pieces.remove(0);
         let new_head = (
-            (head.0 as i16 + self.movement_adder.0).try_into().unwrap(),
-            (head.1 as i16 + self.movement_adder.1).try_into().unwrap(),
+            (previous_head.0 as i16 + self.movement_adder.0)
+                .try_into()
+                .unwrap(),
+            (previous_head.1 as i16 + self.movement_adder.1)
+                .try_into()
+                .unwrap(),
         );
         self.pieces.push(new_head);
-        (new_head, removed_tail)
+        (new_head, removed_tail, previous_head)
     }
     pub fn eat_food(&mut self) {
         let &head = self.pieces.last().unwrap();

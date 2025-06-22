@@ -10,7 +10,7 @@ use crossterm::{
     terminal::{self, size},
 };
 use std::{
-    io::Write,
+    io::{Stdout, Write},
     sync::{Arc, Mutex},
     time::Duration,
     vec,
@@ -28,10 +28,7 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
     loop {
         let snake_for_move = snake.clone();
         tokio::spawn(change_direction(snake.clone()));
-        let removed_tail = snake_for_move.lock().unwrap().move_toward();
-        let move_to_removed_tail = MoveTo(removed_tail.0, removed_tail.1);
-        execute!(stdout, move_to_removed_tail)?;
-        write!(stdout, "")?;
+        show_snake(&mut stdout, snake_for_move);
         sleep(Duration::from_millis(200)).await;
     }
     Ok(())
@@ -52,4 +49,13 @@ async fn change_direction(snake: Arc<Mutex<SnakeBody>>) {
         };
         snake.lock().unwrap().change_direction(direction);
     }
+}
+fn show_snake(stdout: &mut Stdout, snake: Arc<Mutex<SnakeBody>>) {
+    let (newhead, removed_tail) = snake.lock().unwrap().move_toward();
+    let newhead = MoveTo(newhead.0, newhead.1);
+    let removed_tail = MoveTo(removed_tail.0, removed_tail.1);
+    execute!(stdout, newhead);
+    write!(stdout, "#");
+    execute!(stdout, removed_tail);
+    write!(stdout, " ");
 }

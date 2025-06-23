@@ -41,11 +41,7 @@ impl SnakeBody {
         }
         self.movement_adder = new_movement_adder;
     }
-    pub fn move_forward(&mut self, eat_flag: &mut bool) -> Vec<(u16, u16)> {
-        if *eat_flag {
-            *eat_flag = false;
-            return self.pieces.clone();
-        }
+    pub fn move_forward(&mut self) -> Vec<(u16, u16)> {
         let &previous_head = self.pieces.get(self.len - 1).unwrap();
         self.pieces.remove(0);
         let new_head = (
@@ -61,10 +57,13 @@ impl SnakeBody {
     }
     pub fn eat_food(&mut self) {
         let &head = self.pieces.last().unwrap();
-        self.pieces.push((
-            (head.0 as i16 + self.movement_adder.0).try_into().unwrap(),
-            (head.1 as i16 + self.movement_adder.1).try_into().unwrap(),
-        ));
+        self.pieces.insert(
+            0,
+            (
+                (head.0 as i16 + self.movement_adder.0).try_into().unwrap(),
+                (head.1 as i16 + self.movement_adder.1).try_into().unwrap(),
+            ),
+        );
         self.len += 1;
     }
 }

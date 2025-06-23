@@ -26,7 +26,7 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         pieces: vec![(1, 1), (1, 2)],
         movement_adder: (1, 0),
     }));
-    let mut eat_glag = false;
+    let mut eat_glag = 0_u8;
     let command = Arc::new(RwLock::new(CommandKeys::None));
     loop {
         tokio::spawn(read_key_to_command(command.clone()));
@@ -34,13 +34,9 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
             snake.clone().lock().unwrap().change_direction(direction);
             //*command.write().unwrap() = CommandKeys::None;
         }
-        let pieces_pos = snake.clone().lock().unwrap().move_forward(&mut eat_glag);
-        if let CommandKeys::EatFood = *command.read().unwrap() {
-            // snake.clone().lock().unwrap().eat_food();
-            // eat_glag = true;
-            add_food(&mut playground);
-            //*command.write().unwrap() = CommandKeys::None;
-        }
+        let pieces_pos = snake.clone().lock().unwrap().move_forward();
+        feed_snake(&pieces_pos.last().unwrap(), &playground, snake.clone());
+
         if let CommandKeys::End = *command.read().unwrap() {
             end()?;
         }
@@ -48,11 +44,17 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         display_playground(
             &mut stdout,
             &mut playground,
-            pieces_pos,
+            &pieces_pos,
             &mut conversion_vectore,
         )?;
         // display_game(&mut stdout, pieces_pos).await?;
         sleep(Duration::from_millis(200)).await;
+    }
+}
+fn feed_snake(head: &(u16, u16), playground: &[[char; 256]; 256], snake: Arc<Mutex<SnakeBody>>) {
+    let character = playground[head.0 as usize][head.1 as usize];
+    if let Some(n) = character.to_digit(10) {
+        (0..n).for_each(|_| snake.lock().unwrap().eat_food());
     }
 }
 // async fn move_toward(snake: Arc<Mutex<SnakeBody>>){
@@ -106,7 +108,7 @@ fn bind_snake_to_playground(playground: &mut [[char; 256]; 256], pieces_pos: &Ve
 fn display_playground(
     stdout: &mut Stdout,
     playground: &mut [[char; 256]; 256],
-    pieces_pos: Vec<(u16, u16)>,
+    pieces_pos: &Vec<(u16, u16)>,
     conversion_vector: &mut (u16, u16),
 ) -> Result<(), Box<dyn (std::error::Error)>> {
     bind_snake_to_playground(playground, &pieces_pos);

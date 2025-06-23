@@ -1,9 +1,7 @@
 use crate::game::{
-    init::{self, end, print_wall, start},
+    init::{end, print_wall, start},
     model::{CommandKeys, Direction, SnakeBody},
-    snake,
 };
-use async_std::io;
 use crossterm::{
     cursor::MoveTo,
     event::{self, read},
@@ -54,7 +52,6 @@ async fn display_game(
     execute!(stdout, Clear(ClearType::All))?;
     print_wall(stdout)?;
     println!("{:?}", pieces_pos);
-    sleep(Duration::from_secs(1));
     for (index, piece) in pieces_pos.iter().enumerate() {
         let piece_position = MoveTo(piece.0, piece.1);
         execute!(stdout, piece_position)?;

@@ -1,8 +1,8 @@
 use crossterm::{
-    cursor::MoveTo,
+    cursor::{self, MoveTo},
     execute,
     terminal::{
-        self, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode, size,
+        EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode, size,
     },
 };
 
@@ -14,7 +14,7 @@ use std::{
 pub fn start() -> io::Result<Stdout> {
     enable_raw_mode()?;
     let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen, terminal::SetSize(5, 5))?;
+    execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
     print_wall(&mut stdout)?;
     // let terminal_size = terminal::size()?;
     // let mut cursor_position = (terminal_size.0 / 2, terminal_size.1 / 2);

@@ -1,12 +1,14 @@
 use crate::game::{
-    init::{end, start},
+    init::{self, end, print_wall, start},
     model::{CommandKeys, Direction, SnakeBody},
+    snake,
 };
+use async_std::io;
 use crossterm::{
     cursor::MoveTo,
     event::{self, read},
     execute,
-    terminal::size,
+    terminal::{Clear, ClearType, size},
 };
 use std::{
     io::{Stdout, Write},
@@ -30,33 +32,53 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         if let CommandKeys::Directions(ref direction) = *command.read().unwrap() {
             snake.clone().lock().unwrap().change_direction(direction);
         }
-        show_snake(&mut stdout, snake.clone())?;
+        let pieces_pos = snake.clone().lock().unwrap().move_toward();
         if let CommandKeys::EatFood = *command.read().unwrap() {
             snake.clone().lock().unwrap().eat_food();
         }
         if let CommandKeys::End = *command.read().unwrap() {
             end()?;
         }
+        display_game(&mut stdout, pieces_pos).await?;
         sleep(Duration::from_millis(200)).await;
     }
 }
+// async fn move_toward(snake: Arc<Mutex<SnakeBody>>){
 
-fn show_snake(
+// }
+async fn display_game(
     stdout: &mut Stdout,
-    snake: Arc<Mutex<SnakeBody>>,
+    pieces_pos: Vec<(u16, u16)>,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
-    let (new_head, removed_tail, previous_head) = snake.lock().unwrap().move_toward();
-    let new_head = MoveTo(new_head.0, new_head.1);
-    let removed_tail = MoveTo(removed_tail.0, removed_tail.1);
-    let previous_head = MoveTo(previous_head.0, previous_head.1);
-    execute!(stdout, new_head)?;
-    write!(stdout, "X")?;
-    execute!(stdout, previous_head)?;
-    write!(stdout, "O")?;
-    execute!(stdout, removed_tail)?;
-    write!(stdout, " ")?;
+    let len = pieces_pos.len();
+    execute!(stdout, Clear(ClearType::All))?;
+    print_wall(stdout)?;
+    println!("{:?}", pieces_pos);
+    sleep(Duration::from_secs(1));
+    for (index, piece) in pieces_pos.iter().enumerate() {
+        let piece_position = MoveTo(piece.0, piece.1);
+        execute!(stdout, piece_position)?;
+        write!(stdout, "{}", if index == len - 1 { "X" } else { "O" })?;
+        println!("")
+    }
     Ok(())
 }
+// fn show_snake(
+//     stdout: &mut Stdout,
+//     snake: Arc<Mutex<SnakeBody>>,
+// ) -> Result<(), Box<dyn (std::error::Error)>> {
+//     let (new_head, removed_tail, previous_head) = snake.lock().unwrap().move_toward();
+//     let new_head = MoveTo(new_head.0, new_head.1);
+//     let removed_tail = MoveTo(removed_tail.0, removed_tail.1);
+//     let previous_head = MoveTo(previous_head.0, previous_head.1);
+//     execute!(stdout, new_head)?;
+//     write!(stdout, "X")?;
+//     execute!(stdout, previous_head)?;
+//     write!(stdout, "O")?;
+//     execute!(stdout, removed_tail)?;
+//     write!(stdout, " ")?;
+//     Ok(())
+// }
 
 async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
     *command.write().unwrap() = CommandKeys::None;

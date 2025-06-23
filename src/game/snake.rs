@@ -24,19 +24,25 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         pieces: vec![(terminal_size.0 / 2, terminal_size.1 / 2)],
         movement_adder: (1, 0),
     }));
+    let mut eat_glag = false;
     let command = Arc::new(RwLock::new(CommandKeys::None));
     loop {
         tokio::spawn(read_key_to_command(command.clone()));
         if let CommandKeys::Directions(ref direction) = *command.read().unwrap() {
             snake.clone().lock().unwrap().change_direction(direction);
+            //*command.write().unwrap() = CommandKeys::None;
         }
-        let pieces_pos = snake.clone().lock().unwrap().move_toward();
+        let pieces_pos = snake.clone().lock().unwrap().move_forward(&mut eat_glag);
         if let CommandKeys::EatFood = *command.read().unwrap() {
             snake.clone().lock().unwrap().eat_food();
+            eat_glag = true;
+            //*command.write().unwrap() = CommandKeys::None;
         }
         if let CommandKeys::End = *command.read().unwrap() {
             end()?;
         }
+        *command.write().unwrap() = CommandKeys::None;
+
         display_game(&mut stdout, pieces_pos).await?;
         sleep(Duration::from_millis(200)).await;
     }
@@ -78,7 +84,6 @@ async fn display_game(
 // }
 
 async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
-    *command.write().unwrap() = CommandKeys::None;
     loop {
         let key_event = spawn_blocking(|| read().unwrap()).await.unwrap();
         let new_command = match key_event.as_key_press_event().unwrap().code {

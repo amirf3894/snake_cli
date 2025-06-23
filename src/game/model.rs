@@ -41,7 +41,11 @@ impl SnakeBody {
         }
         self.movement_adder = new_movement_adder;
     }
-    pub fn move_toward(&mut self) -> Vec<(u16, u16)> {
+    pub fn move_forward(&mut self, eat_flag: &mut bool) -> Vec<(u16, u16)> {
+        if *eat_flag {
+            *eat_flag = false;
+            return self.pieces.clone();
+        }
         let &previous_head = self.pieces.get(self.len - 1).unwrap();
         self.pieces.remove(0);
         let new_head = (

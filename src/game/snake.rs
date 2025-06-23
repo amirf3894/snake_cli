@@ -8,14 +8,15 @@ use crossterm::{
     execute,
     terminal::size,
 };
+use rand::{random_range, rng, seq::IndexedRandom};
 use std::{
     io::{Stdout, Write},
+    ops::Deref,
     sync::{Arc, Mutex, RwLock},
     time::Duration,
     vec,
 };
 use tokio::{task::spawn_blocking, time::sleep};
-
 pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
     let mut conversion_vectore = (0, 0);
     let mut playground: [[char; 256]; 256] = [[' '; 256]; 256];
@@ -35,8 +36,9 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         }
         let pieces_pos = snake.clone().lock().unwrap().move_forward(&mut eat_glag);
         if let CommandKeys::EatFood = *command.read().unwrap() {
-            snake.clone().lock().unwrap().eat_food();
-            eat_glag = true;
+            // snake.clone().lock().unwrap().eat_food();
+            // eat_glag = true;
+            add_food(&mut playground);
             //*command.write().unwrap() = CommandKeys::None;
         }
         if let CommandKeys::End = *command.read().unwrap() {
@@ -72,9 +74,23 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
 //     }
 //     Ok(())
 // }
+pub fn add_food(playground: &mut [[char; 256]; 256]) {
+    let mut x = 0;
+    let mut y = 0;
+    while playground[x][y] != ' ' {
+        x = random_range(1..256);
+        y = random_range(1..256);
+    }
+    let mut rng = rng();
+    let &weight = [1, 1, 1, 2, 2, 3].choose(&mut rng).unwrap();
+    playground[x][y] = std::char::from_digit(weight, 10).unwrap();
+}
 fn bind_snake_to_playground(playground: &mut [[char; 256]; 256], pieces_pos: &Vec<(u16, u16)>) {
     for x in 1..256 {
         for y in 1..256 {
+            if playground[x][y].is_digit(10) {
+                continue;
+            }
             playground[x][y] = ' ';
         }
     }

@@ -11,6 +11,8 @@ use std::{
     process::exit,
 };
 
+use crate::game::snake::add_food;
+
 pub fn start(playground: &mut [[char; 256]; 256]) -> io::Result<Stdout> {
     enable_raw_mode()?;
     let mut stdout = stdout();
@@ -22,6 +24,7 @@ pub fn start(playground: &mut [[char; 256]; 256]) -> io::Result<Stdout> {
         playground[len - 1][i] = '|';
         playground[i][len - 1] = '—';
     }
+    (0..200).for_each(|_| add_food(playground));
 
     //print_wall(&mut stdout)?;
     // let terminal_size = terminal::size()?;

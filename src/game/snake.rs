@@ -1,12 +1,12 @@
 use crate::game::{
-    init::{end, print_wall, start},
+    init::{end, start},
     model::{CommandKeys, Direction, SnakeBody},
 };
 use crossterm::{
     cursor::MoveTo,
     event::{self, read},
     execute,
-    terminal::{Clear, ClearType, size},
+    terminal::size,
 };
 use std::{
     io::{Stdout, Write},
@@ -17,11 +17,12 @@ use std::{
 use tokio::{task::spawn_blocking, time::sleep};
 
 pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
-    let mut stdout = start()?;
-    let terminal_size = size()?;
+    let mut conversion_vectore = (0, 0);
+    let mut playground: [[char; 256]; 256] = [[' '; 256]; 256];
+    let mut stdout = start(&mut playground)?;
     let snake = Arc::new(Mutex::new(SnakeBody {
-        len: 1,
-        pieces: vec![(terminal_size.0 / 2, terminal_size.1 / 2)],
+        len: 2,
+        pieces: vec![(1, 1), (1, 2)],
         movement_adder: (1, 0),
     }));
     let mut eat_glag = false;
@@ -42,27 +43,89 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
             end()?;
         }
         *command.write().unwrap() = CommandKeys::None;
-
-        display_game(&mut stdout, pieces_pos).await?;
+        display_playground(
+            &mut stdout,
+            &mut playground,
+            pieces_pos,
+            &mut conversion_vectore,
+        )?;
+        // display_game(&mut stdout, pieces_pos).await?;
         sleep(Duration::from_millis(200)).await;
     }
 }
 // async fn move_toward(snake: Arc<Mutex<SnakeBody>>){
 
 // }
-async fn display_game(
-    stdout: &mut Stdout,
-    pieces_pos: Vec<(u16, u16)>,
-) -> Result<(), Box<dyn (std::error::Error)>> {
+// async fn display_game(
+//     stdout: &mut Stdout,
+//     pieces_pos: Vec<(u16, u16)>,
+// ) -> Result<(), Box<dyn (std::error::Error)>> {
+//     let len = pieces_pos.len();
+//     execute!(stdout, Clear(ClearType::All))?;
+//     print_wall(stdout)?;
+//     println!("{:?}", pieces_pos);
+//     for (index, piece) in pieces_pos.iter().enumerate() {
+//         let piece_position = MoveTo(piece.0, piece.1);
+//         execute!(stdout, piece_position)?;
+//         write!(stdout, "{}", if index == len - 1 { "X" } else { "O" })?;
+//         println!("")
+//     }
+//     Ok(())
+// }
+fn bind_snake_to_playground(playground: &mut [[char; 256]; 256], pieces_pos: &Vec<(u16, u16)>) {
+    for x in 1..256 {
+        for y in 1..256 {
+            playground[x][y] = ' ';
+        }
+    }
     let len = pieces_pos.len();
-    execute!(stdout, Clear(ClearType::All))?;
-    print_wall(stdout)?;
-    println!("{:?}", pieces_pos);
-    for (index, piece) in pieces_pos.iter().enumerate() {
-        let piece_position = MoveTo(piece.0, piece.1);
-        execute!(stdout, piece_position)?;
-        write!(stdout, "{}", if index == len - 1 { "X" } else { "O" })?;
-        println!("")
+    for (index, &(x, y)) in pieces_pos.iter().enumerate() {
+        if index == len - 1 {
+            playground[x as usize][y as usize] = 'X';
+            continue;
+        }
+        playground[x as usize][y as usize] = 'O';
+    }
+}
+fn display_playground(
+    stdout: &mut Stdout,
+    playground: &mut [[char; 256]; 256],
+    pieces_pos: Vec<(u16, u16)>,
+    conversion_vector: &mut (u16, u16),
+) -> Result<(), Box<dyn (std::error::Error)>> {
+    bind_snake_to_playground(playground, &pieces_pos);
+    let snake_head = pieces_pos.get(pieces_pos.len() - 1).unwrap();
+    let terminal_size = size()?;
+    if snake_head.0.saturating_sub(conversion_vector.0) == 2 {
+        *conversion_vector = (conversion_vector.0.saturating_sub(1), conversion_vector.1);
+    } else if snake_head.1.saturating_sub(conversion_vector.1) == 2 {
+        *conversion_vector = (conversion_vector.0, conversion_vector.1.saturating_sub(1));
+    } else if (terminal_size.0 - 1 + conversion_vector.0).saturating_sub(snake_head.0) == 2 {
+        *conversion_vector = (conversion_vector.0 + 1, conversion_vector.1);
+    } else if (terminal_size.1 - 1 + conversion_vector.1).saturating_sub(snake_head.1) == 2 {
+        *conversion_vector = (conversion_vector.0, conversion_vector.1 + 1);
+    }
+
+    // if snake_head.0 + 5 > terminal_size.0 + conversion_vector.0
+    //     || snake_head.1 + 5 > terminal_size.1 + conversion_vector.1
+    //     || snake_head.0 < conversion_vector.0 + 4
+    //     || snake_head.1 < conversion_vector.1 + 4
+    // {
+    //     *conversion_vector = (
+    //         (snake_head.0 + 5).saturating_sub(terminal_size.0),
+    //         (snake_head.1 + 5).saturating_sub(terminal_size.1),
+    //     );
+    // }
+
+    for x in 0..terminal_size.0 {
+        for y in 0..terminal_size.1 {
+            execute!(stdout, MoveTo(x, y))?;
+            write!(
+                stdout,
+                "{}",
+                playground[(x + conversion_vector.0) as usize][(y + conversion_vector.1) as usize]
+            )?;
+        }
     }
     Ok(())
 }

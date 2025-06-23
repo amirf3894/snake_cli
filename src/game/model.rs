@@ -51,10 +51,10 @@ impl SnakeBody {
         let new_head = (
             (previous_head.0 as i16 + self.movement_adder.0)
                 .try_into()
-                .unwrap(),
+                .unwrap_or(0),
             (previous_head.1 as i16 + self.movement_adder.1)
                 .try_into()
-                .unwrap(),
+                .unwrap_or(0),
         );
         self.pieces.push(new_head);
         self.pieces.clone()

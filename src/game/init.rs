@@ -11,11 +11,19 @@ use std::{
     process::exit,
 };
 
-pub fn start() -> io::Result<Stdout> {
+pub fn start(playground: &mut [[char; 256]; 256]) -> io::Result<Stdout> {
     enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
-    print_wall(&mut stdout)?;
+    let len = playground.len();
+    for i in 0..len {
+        playground[0][i] = '|';
+        playground[i][0] = '_';
+        playground[len - 1][i] = '|';
+        playground[i][len - 1] = '—';
+    }
+
+    //print_wall(&mut stdout)?;
     // let terminal_size = terminal::size()?;
     // let mut cursor_position = (terminal_size.0 / 2, terminal_size.1 / 2);
     // execute!(stdout, cursor::MoveTo(cursor_position.0, cursor_position.1))?;

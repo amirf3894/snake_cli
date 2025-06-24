@@ -11,25 +11,28 @@ use crossterm::{
 use rand::{random_range, rng, seq::IndexedRandom};
 use std::{
     io::{Stdout, Write},
-    ops::Deref,
     sync::{Arc, Mutex, RwLock},
     time::Duration,
     vec,
 };
 use tokio::{task::spawn_blocking, time::sleep};
 pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
+    const DEFUALT_DURATION: u64 = 110;
+    const FASTER_DURATION: u64 = 60;
     let mut conversion_vectore = (0, 0);
+
     let mut playground: [[char; 256]; 256] = [[' '; 256]; 256];
     let mut stdout = start(&mut playground)?;
+    let mut duration = DEFUALT_DURATION;
+    let mut snake_loose_weight = false;
     let snake = Arc::new(Mutex::new(SnakeBody {
         len: 2,
         pieces: vec![(1, 1), (1, 2)],
         movement_adder: (1, 0),
     }));
-    let mut eat_glag = 0_u8;
     let command = Arc::new(RwLock::new(CommandKeys::None));
+    tokio::spawn(read_key_to_command(command.clone()));
     loop {
-        tokio::spawn(read_key_to_command(command.clone()));
         if let CommandKeys::Directions(ref direction) = *command.read().unwrap() {
             snake.clone().lock().unwrap().change_direction(direction);
             //*command.write().unwrap() = CommandKeys::None;
@@ -40,15 +43,39 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         if let CommandKeys::End = *command.read().unwrap() {
             end()?;
         }
-        *command.write().unwrap() = CommandKeys::None;
         display_playground(
             &mut stdout,
             &mut playground,
             &pieces_pos,
             &mut conversion_vectore,
         )?;
+        if let CommandKeys::Faster = *command.read().unwrap() {
+            if duration == FASTER_DURATION {
+                duration = DEFUALT_DURATION;
+                snake_loose_weight = false;
+            } else {
+                duration = FASTER_DURATION;
+                snake_loose_weight = true;
+            }
+        }
+        *command.write().unwrap() = CommandKeys::None;
+
+        if duration == FASTER_DURATION {
+            if snake_loose_weight {
+                let mut snake_gaurd = snake.lock().unwrap();
+                if snake_gaurd.len < 3 {
+                    duration = DEFUALT_DURATION
+                } else {
+                    snake_gaurd.pieces.remove(0);
+                    snake_gaurd.len -= 1;
+                }
+            }
+            snake_loose_weight = !snake_loose_weight;
+        }
+
+        // *command.write().unwrap() = CommandKeys::None;
         // display_game(&mut stdout, pieces_pos).await?;
-        sleep(Duration::from_millis(200)).await;
+        sleep(Duration::from_millis(duration)).await;
     }
 }
 fn feed_snake(head: &(u16, u16), playground: &[[char; 256]; 256], snake: Arc<Mutex<SnakeBody>>) {
@@ -77,6 +104,8 @@ fn feed_snake(head: &(u16, u16), playground: &[[char; 256]; 256], snake: Arc<Mut
 //     Ok(())
 // }
 pub fn add_food(playground: &mut [[char; 256]; 256]) {
+    const FOODS: [u32; 15] = [1, 1, 1, 2, 2, 4, 4, 3, 3, 8, 9, 12, 2, 9, 8];
+
     let mut x = 0;
     let mut y = 0;
     while playground[x][y] != ' ' {
@@ -84,8 +113,8 @@ pub fn add_food(playground: &mut [[char; 256]; 256]) {
         y = random_range(1..256);
     }
     let mut rng = rng();
-    let &weight = [1, 1, 1, 2, 2, 3].choose(&mut rng).unwrap();
-    playground[x][y] = std::char::from_digit(weight, 10).unwrap();
+    let &weight = FOODS.choose(&mut rng).unwrap();
+    playground[x][y] = std::char::from_digit(weight, 16).unwrap();
 }
 fn bind_snake_to_playground(playground: &mut [[char; 256]; 256], pieces_pos: &Vec<(u16, u16)>) {
     for x in 1..256 {
@@ -165,6 +194,7 @@ fn display_playground(
 // }
 
 async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
+    //~*command.write().unwrap() = CommandKeys::None;
     loop {
         let key_event = spawn_blocking(|| read().unwrap()).await.unwrap();
         let new_command = match key_event.as_key_press_event().unwrap().code {
@@ -172,10 +202,11 @@ async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
             event::KeyCode::Down => CommandKeys::Directions(Direction::Down),
             event::KeyCode::Right => CommandKeys::Directions(Direction::Right),
             event::KeyCode::Left => CommandKeys::Directions(Direction::Left),
-            event::KeyCode::Enter => CommandKeys::EatFood,
+            event::KeyCode::Char(' ') => CommandKeys::Faster,
             event::KeyCode::Esc => CommandKeys::End,
             _ => continue,
         };
         *command.write().unwrap() = new_command;
+        // return;
     }
 }

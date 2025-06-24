@@ -87,8 +87,6 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
             snake_loose_weight = !snake_loose_weight;
         }
 
-        // *command.write().unwrap() = CommandKeys::None;
-        // display_game(&mut stdout, pieces_pos).await?;
         sleep(Duration::from_millis(duration)).await;
     }
 }
@@ -117,25 +115,7 @@ fn snake_status_check(
     }
     Ok(())
 }
-// async fn move_toward(snake: Arc<Mutex<SnakeBody>>){
 
-// }
-// async fn display_game(
-//     stdout: &mut Stdout,
-//     pieces_pos: Vec<(u16, u16)>,
-// ) -> Result<(), Box<dyn (std::error::Error)>> {
-//     let len = pieces_pos.len();
-//     execute!(stdout, Clear(ClearType::All))?;
-//     print_wall(stdout)?;
-//     println!("{:?}", pieces_pos);
-//     for (index, piece) in pieces_pos.iter().enumerate() {
-//         let piece_position = MoveTo(piece.0, piece.1);
-//         execute!(stdout, piece_position)?;
-//         write!(stdout, "{}", if index == len - 1 { "X" } else { "O" })?;
-//         println!("")
-//     }
-//     Ok(())
-// }
 pub fn add_food(playground: &mut [[char; 256]; 256]) {
     const FOODS: [u32; 15] = [1, 1, 1, 2, 2, 4, 4, 3, 3, 8, 9, 12, 2, 9, 8];
 
@@ -186,17 +166,6 @@ fn display_playground(
         *conversion_vector = (conversion_vector.0, conversion_vector.1 + 1);
     }
 
-    // if snake_head.0 + 5 > terminal_size.0 + conversion_vector.0
-    //     || snake_head.1 + 5 > terminal_size.1 + conversion_vector.1
-    //     || snake_head.0 < conversion_vector.0 + 4
-    //     || snake_head.1 < conversion_vector.1 + 4
-    // {
-    //     *conversion_vector = (
-    //         (snake_head.0 + 5).saturating_sub(terminal_size.0),
-    //         (snake_head.1 + 5).saturating_sub(terminal_size.1),
-    //     );
-    // }
-
     for x in 0..terminal_size.0 {
         for y in 0..terminal_size.1 {
             execute!(stdout, MoveTo(x, y))?;
@@ -209,22 +178,6 @@ fn display_playground(
     }
     Ok(())
 }
-// fn show_snake(
-//     stdout: &mut Stdout,
-//     snake: Arc<Mutex<SnakeBody>>,
-// ) -> Result<(), Box<dyn (std::error::Error)>> {
-//     let (new_head, removed_tail, previous_head) = snake.lock().unwrap().move_toward();
-//     let new_head = MoveTo(new_head.0, new_head.1);
-//     let removed_tail = MoveTo(removed_tail.0, removed_tail.1);
-//     let previous_head = MoveTo(previous_head.0, previous_head.1);
-//     execute!(stdout, new_head)?;
-//     write!(stdout, "X")?;
-//     execute!(stdout, previous_head)?;
-//     write!(stdout, "O")?;
-//     execute!(stdout, removed_tail)?;
-//     write!(stdout, " ")?;
-//     Ok(())
-// }
 
 async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
     //~*command.write().unwrap() = CommandKeys::None;

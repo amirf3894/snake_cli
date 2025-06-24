@@ -184,10 +184,18 @@ async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
     loop {
         let key_event = spawn_blocking(|| read().unwrap()).await.unwrap();
         let new_command = match key_event.as_key_press_event().unwrap().code {
-            event::KeyCode::Up => CommandKeys::Directions(Direction::Up),
-            event::KeyCode::Down => CommandKeys::Directions(Direction::Down),
-            event::KeyCode::Right => CommandKeys::Directions(Direction::Right),
-            event::KeyCode::Left => CommandKeys::Directions(Direction::Left),
+            event::KeyCode::Up | event::KeyCode::Char('w') | event::KeyCode::Char('W') => {
+                CommandKeys::Directions(Direction::Up)
+            }
+            event::KeyCode::Down | event::KeyCode::Char('s') | event::KeyCode::Char('S') => {
+                CommandKeys::Directions(Direction::Down)
+            }
+            event::KeyCode::Right | event::KeyCode::Char('d') | event::KeyCode::Char('D') => {
+                CommandKeys::Directions(Direction::Right)
+            }
+            event::KeyCode::Left | event::KeyCode::Char('a') | event::KeyCode::Char('A') => {
+                CommandKeys::Directions(Direction::Left)
+            }
             event::KeyCode::Char(' ') => CommandKeys::Faster,
             event::KeyCode::Esc => CommandKeys::End,
             _ => continue,

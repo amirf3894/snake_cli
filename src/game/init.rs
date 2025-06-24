@@ -1,15 +1,13 @@
 use crossterm::{
     cursor::{self, MoveTo},
+    event::read,
     execute,
     terminal::{
         EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode, size,
     },
 };
 
-use std::{
-    io::{self, Stdout, Write, stdout},
-    process::exit,
-};
+use std::io::{self, Stdout, Write, stdout};
 
 use crate::game::snake::add_food;
 
@@ -19,10 +17,10 @@ pub fn start(playground: &mut [[char; 256]; 256]) -> io::Result<Stdout> {
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
     let len = playground.len();
     for i in 0..len {
-        playground[0][i] = '|';
-        playground[i][0] = '_';
-        playground[len - 1][i] = '|';
-        playground[i][len - 1] = '—';
+        playground[0][i] = '#';
+        playground[i][0] = '#';
+        playground[len - 1][i] = '#';
+        playground[i][len - 1] = '#';
     }
     (0..200).for_each(|_| add_food(playground));
 
@@ -55,11 +53,26 @@ pub fn start(playground: &mut [[char; 256]; 256]) -> io::Result<Stdout> {
     Ok(stdout)
 }
 
-pub fn end() -> io::Result<()> {
-    let mut stdout = stdout();
+pub fn end(text: &str, stdout: &mut Stdout) -> io::Result<()> {
+    let size = size()?;
+    //println!("{}", text);
+    for (i, phrase) in text.split("\n").enumerate() {
+        execute!(
+            stdout,
+            MoveTo((size.0 - phrase.len() as u16) / 2, size.1 / 2 + i as u16)
+        )?;
+        // println!("HAHAHAHAH");
+        write!(stdout, "{}", phrase)?;
+        stdout.flush()?;
+    }
+    // let text_len = text.split("\n").next().unwrap().len() as u16;
+    // execute!(stdout, MoveTo((size.0 - text_len) / 2, size.1 / 2))?;
+    // print!("{}", text)
+    read()?;
     execute!(stdout, LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    exit(0);
+    Ok(())
+    //exit(0);
 }
 
 pub fn print_wall(stdout: &mut Stdout) -> io::Result<()> {

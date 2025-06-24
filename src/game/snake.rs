@@ -11,6 +11,7 @@ use crossterm::{
 use rand::{random_range, rng, seq::IndexedRandom};
 use std::{
     io::{Stdout, Write},
+    process::exit,
     sync::{Arc, Mutex, RwLock},
     time::Duration,
     vec,
@@ -38,10 +39,23 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
             //*command.write().unwrap() = CommandKeys::None;
         }
         let pieces_pos = snake.clone().lock().unwrap().move_forward();
-        feed_snake(&pieces_pos.last().unwrap(), &playground, snake.clone());
+        snake_status_check(
+            &pieces_pos.last().unwrap(),
+            &playground,
+            snake.clone(),
+            &mut stdout,
+        )?;
 
         if let CommandKeys::End = *command.read().unwrap() {
-            end()?;
+            let mut text = String::new();
+            text += "*********************************\n";
+            text += "*********************************\n";
+            text += "*** PRESS A KEY TWICE TO QUIT ***\n";
+            text += "***     HOPE YOU ENJOY :)     ***\n";
+            text += "*********************************\n";
+            text += "*********************************";
+            end(&text, &mut stdout)?;
+            exit(0);
         }
         display_playground(
             &mut stdout,
@@ -78,11 +92,30 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
         sleep(Duration::from_millis(duration)).await;
     }
 }
-fn feed_snake(head: &(u16, u16), playground: &[[char; 256]; 256], snake: Arc<Mutex<SnakeBody>>) {
+fn snake_status_check(
+    head: &(u16, u16),
+    playground: &[[char; 256]; 256],
+    snake: Arc<Mutex<SnakeBody>>,
+    stdout: &mut Stdout,
+) -> Result<(), Box<dyn (std::error::Error)>> {
     let character = playground[head.0 as usize][head.1 as usize];
+    if character == '#' || character == 'O' || character == 'X' {
+        let mut text = String::new();
+        text += "*********************************\n";
+        text += "*********************************\n";
+        text += "***         YOU LOOSE         ***\n";
+        text += "*** PRESS A KEY TWICE TO QUIT ***\n";
+        text += "*********************************\n";
+        text += "*********************************";
+
+        end(&text, stdout)?;
+        println!("you loose \nscore: {}", snake.lock().unwrap().len);
+        exit(0);
+    }
     if let Some(n) = character.to_digit(10) {
         (0..n).for_each(|_| snake.lock().unwrap().eat_food());
     }
+    Ok(())
 }
 // async fn move_toward(snake: Arc<Mutex<SnakeBody>>){
 
@@ -116,7 +149,7 @@ pub fn add_food(playground: &mut [[char; 256]; 256]) {
     let &weight = FOODS.choose(&mut rng).unwrap();
     playground[x][y] = std::char::from_digit(weight, 16).unwrap();
 }
-fn bind_snake_to_playground(playground: &mut [[char; 256]; 256], pieces_pos: &Vec<(u16, u16)>) {
+fn update_playground(playground: &mut [[char; 256]; 256], pieces_pos: &Vec<(u16, u16)>) {
     for x in 1..256 {
         for y in 1..256 {
             if playground[x][y].is_digit(10) {
@@ -140,7 +173,7 @@ fn display_playground(
     pieces_pos: &Vec<(u16, u16)>,
     conversion_vector: &mut (u16, u16),
 ) -> Result<(), Box<dyn (std::error::Error)>> {
-    bind_snake_to_playground(playground, &pieces_pos);
+    update_playground(playground, &pieces_pos);
     let snake_head = pieces_pos.get(pieces_pos.len() - 1).unwrap();
     let terminal_size = size()?;
     if snake_head.0.saturating_sub(conversion_vector.0) == 2 {

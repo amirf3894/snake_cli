@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-async-std = "1.13.1"
 clap = "4.5.40"
 crossterm = "0.29.0"
 rand = "0.9.1"

@@ -27,8 +27,11 @@ pub enum CommandKeys {
     None,
 }
 impl CommandKeys {
-    pub fn clear(&mut self) {
-        *self = CommandKeys::None;
+    pub fn is_none(&self) -> bool {
+        if let CommandKeys::None = *self {
+            return true;
+        }
+        false
     }
 }
 impl SnakeBody {

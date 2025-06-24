@@ -18,8 +18,8 @@ use std::{
 };
 use tokio::{task::spawn_blocking, time::sleep};
 pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
-    const DEFUALT_DURATION: u64 = 110;
-    const FASTER_DURATION: u64 = 60;
+    const DEFUALT_DURATION: u64 = 100;
+    const FASTER_DURATION: u64 = 50;
     let mut conversion_vectore = (0, 0);
 
     let mut playground: [[char; 256]; 256] = [[' '; 256]; 256];
@@ -180,8 +180,11 @@ fn display_playground(
 }
 
 async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
-    //~*command.write().unwrap() = CommandKeys::None;
+    //~*command.write().unwrap() = CommandKeys::None
     loop {
+        if !command.read().unwrap().is_none() {
+            continue;
+        }
         let key_event = spawn_blocking(|| read().unwrap()).await.unwrap();
         let new_command = match key_event.as_key_press_event().unwrap().code {
             event::KeyCode::Up | event::KeyCode::Char('w') | event::KeyCode::Char('W') => {

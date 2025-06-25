@@ -33,7 +33,8 @@ pub fn end(text: &str, stdout: &mut Stdout) -> io::Result<()> {
     for (i, phrase) in text.split("\n").enumerate() {
         execute!(
             stdout,
-            MoveTo((size.0 - phrase.len() as u16) / 2, size.1 / 2 + i as u16)
+            MoveTo((size.0 - phrase.len() as u16) / 2, size.1 / 2 + i as u16),
+            cursor::Show
         )?;
         // println!("HAHAHAHAH");
         write!(stdout, "{}", phrase)?;

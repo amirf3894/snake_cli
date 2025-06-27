@@ -6,7 +6,7 @@ use crossterm::{
     terminal::{LeaveAlternateScreen, disable_raw_mode},
 };
 //use snake::game::snake;
-use snakecli::{self, game};
+use snakecli::{self, game, server::host::main_host};
 #[tokio::main]
 async fn main() {
     let matches = Command::new("snake")
@@ -20,11 +20,18 @@ async fn main() {
                         .help("An ip that server is visible for client"),
                 )
                 .arg(
-                    Arg::new("size")
-                        .short('s')
-                        .long("size")
-                        .default_value("(200, 100)")
-                        .help("Playground size which players play on it default is: (200, 100)"),
+                    Arg::new("height")
+                        .short('H')
+                        .long("height")
+                        .default_value("200")
+                        .help("Playground height size which players play on it default is: 200"),
+                )
+                .arg(
+                    Arg::new("width")
+                        .short('W')
+                        .long("width")
+                        .default_value("100")
+                        .help("Playground width size which players play on it default is: 100"),
                 )
                 .about("Create a server that clients connect to it"),
         )
@@ -52,20 +59,28 @@ async fn main() {
         .get_matches();
 
     let result = match matches.subcommand() {
-        Some(("host", arg)) => host(arg),
-        Some(("client", arg)) => client(arg),
+        Some(("host", arg)) => host(arg).await,
+        // Some(("client", arg)) => client(arg),
         Some(("solo", _)) => solo().await,
         _ => exit(0),
     };
-    disable_raw_mode().unwrap();
-    execute!(stdout(), LeaveAlternateScreen, cursor::Show).unwrap();
+    // disable_raw_mode().unwrap();
+
+    // execute!(stdout(), LeaveAlternateScreen, cursor::Show).unwrap();
     if let Err(e) = result {
         println!("An error occoured");
         println!("{}", e.to_string());
         exit(1);
     }
 }
-fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
+async fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
+    let addr = arg.get_one::<String>("ip").unwrap();
+    let width = arg.get_one::<String>("width").unwrap();
+    let height = arg.get_one::<String>("height").unwrap();
+    let width: u16 = width.trim().parse()?;
+    let height: u16 = height.trim().parse()?;
+    main_host((width, height), addr).await?;
+    //println!("left");
     Ok(())
 }
 fn client(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {

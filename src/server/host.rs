@@ -64,13 +64,14 @@ async fn update_playground(
     mut rx: Receiver<Vec<(u16, u16)>>,
 ) {
     let mut cloned_playground = {
-        let mut guard = playground.read().unwrap();
+        let guard = playground.read().unwrap();
         (*guard).clone()
     };
     //let mut playground = playground.write().unwrap();
     let (width, height) = { (cloned_playground.len(), cloned_playground[0].len()) };
     loop {
         let pieces_pos = rx.recv().await.unwrap();
+        println!("recieved from channel");
         for x in 1..width {
             for y in 1..height {
                 if cloned_playground[x][y].is_digit(10) {
@@ -96,20 +97,26 @@ pub async fn clinet_tasks(
     mut socket: TcpStream,
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
-    let mut conversion_vector = (0, 0);
     let mut buf = [0_u8; 500];
-    let readable_playground = playground.read().unwrap();
     println!("a user entered");
-    let playground_size = (readable_playground.len(), readable_playground[0].len());
+    let playground_size = {
+        (
+            playground.read().unwrap().len(),
+            playground.read().unwrap()[0].len(),
+        )
+    };
+
     let movement_adder = (-1, 0);
     let mut head_pos = (0, 0);
-    socket.read(&mut buf).await?;
-    let username = String::from_utf8_lossy(&buf).to_string();
+    let len = socket.read(&mut buf).await?;
+    let mut command =
+        serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]).to_string())?;
     socket.write_u8(1).await?;
     let mut tail_pos = (
         (head_pos.0 as i16 - movement_adder.0) as usize,
         (head_pos.1 as i16 - movement_adder.1) as usize,
     );
+    let readable_playground = playground.read().unwrap();
     while readable_playground[head_pos.0][head_pos.1] != ' '
         || readable_playground[tail_pos.0][tail_pos.1] != ' '
     {
@@ -119,6 +126,13 @@ pub async fn clinet_tasks(
             (head_pos.1 as i16 - movement_adder.1) as usize,
         );
     }
+    drop(readable_playground);
+    let terminal_size = command.terminal_size;
+    let mut conversion_vector = (
+        head_pos.0.saturating_sub(terminal_size.0 as usize) as u16 + 3,
+        head_pos.1.saturating_sub(terminal_size.1 as usize) as u16 + 3,
+    );
+
     let mut snake = SnakeBody {
         len: 2,
         pieces: vec![
@@ -140,9 +154,9 @@ pub async fn clinet_tasks(
         let recieved_data = String::from_utf8_lossy(&buf[..len]);
 
         let recieved_data = serde_json::from_str::<ClientSendData>(&recieved_data)?;
-        println!("bib",);
         let command = recieved_data.command;
         let terminal_size = recieved_data.terminal_size;
+        println!("{:?}", command);
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
@@ -200,6 +214,7 @@ fn user_display_generator(
         }
         //data.push('\n');
     }
+    //println!("{:?}", pieces_pos.last().unwrap());
     // println!("{data}");
     Ok(data)
 }
@@ -215,6 +230,7 @@ fn snake_status_check(
     snake: &mut SnakeBody,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
     let character = playground.read().unwrap()[head.0 as usize][head.1 as usize];
+    println!("bib",);
     if character == '#' || character == 'O' || character == 'X' {
         Err("loose")?;
     }

@@ -179,12 +179,13 @@ fn display_playground(
     Ok(())
 }
 
-async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
+pub async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
     //~*command.write().unwrap() = CommandKeys::None
     loop {
         if !command.read().unwrap().is_none() {
             continue;
         }
+        //let key_event = read().unwrap();
         let key_event = spawn_blocking(|| read().unwrap()).await.unwrap();
         let new_command = match key_event.as_key_press_event().unwrap().code {
             event::KeyCode::Up | event::KeyCode::Char('w') | event::KeyCode::Char('W') => {

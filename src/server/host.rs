@@ -1,13 +1,13 @@
 use crate::game::{
+    self,
     model::{self, CommandKeys, SnakeBody},
     snake::{self},
 };
 use clap::{self};
-use rand::random_range;
+use rand::{rand_core::le, random_range};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
-    collections::btree_set::Difference,
     sync::{Arc, RwLock},
     thread,
     time::Duration,
@@ -20,21 +20,22 @@ use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     time::{error::Error, sleep},
 };
-#[derive(Serialize, Deserialize)]
-struct UserInputData {
-    terminal_size: (u16, u16),
-    command: CommandKeys,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ClientSendData {
+    pub terminal_size: (u16, u16),
+    pub command: CommandKeys,
 }
-#[derive(Serialize, Deserialize)]
-struct UserOutputData {
-    display_data: String,
-    status: String,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HostSideData {
+    pub display_data: String,
+    pub status: String,
 }
 pub async fn main_host(size: (u16, u16), addr: &str) -> Result<(), Box<dyn (std::error::Error)>> {
     let (tx, rx) = mpsc::channel::<Vec<(u16, u16)>>(300);
-    let mut playground = Arc::new(RwLock::new(
+    let playground = Arc::new(RwLock::new(
         vec![vec![' '; size.1 as usize].into_boxed_slice(); size.0 as usize].into_boxed_slice(),
     ));
+    start(playground.clone());
     let listener = TcpListener::bind(addr).await?;
     let async_playground = playground.clone(); //let async_playground = playground.clone();
     let check_new_user_handler = tokio::spawn(async move {
@@ -62,27 +63,31 @@ async fn update_playground(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
     mut rx: Receiver<Vec<(u16, u16)>>,
 ) {
-    let mut playground = playground.write().unwrap();
-    let (width, height) = (playground.len(), playground[0].len());
-
+    let mut cloned_playground = {
+        let mut guard = playground.read().unwrap();
+        (*guard).clone()
+    };
+    //let mut playground = playground.write().unwrap();
+    let (width, height) = { (cloned_playground.len(), cloned_playground[0].len()) };
     loop {
         let pieces_pos = rx.recv().await.unwrap();
         for x in 1..width {
             for y in 1..height {
-                if playground[x][y].is_digit(10) {
+                if cloned_playground[x][y].is_digit(10) {
                     continue;
                 }
-                playground[x][y] = ' ';
+                cloned_playground[x][y] = ' ';
             }
         }
         let len = pieces_pos.len();
         for (index, &(x, y)) in pieces_pos.iter().enumerate() {
             if index == len - 1 {
-                playground[x as usize][y as usize] = 'X';
+                cloned_playground[x as usize][y as usize] = 'X';
                 continue;
             }
-            playground[x as usize][y as usize] = 'O';
+            cloned_playground[x as usize][y as usize] = 'O';
         }
+        *playground.write().unwrap() = cloned_playground.clone();
     }
 }
 //pub async fn wait_for_connect()
@@ -91,13 +96,16 @@ pub async fn clinet_tasks(
     mut socket: TcpStream,
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
-    println!("a user entered");
     let mut conversion_vector = (0, 0);
     let mut buf = [0_u8; 500];
     let readable_playground = playground.read().unwrap();
+    println!("a user entered");
     let playground_size = (readable_playground.len(), readable_playground[0].len());
     let movement_adder = (-1, 0);
     let mut head_pos = (0, 0);
+    socket.read(&mut buf).await?;
+    let username = String::from_utf8_lossy(&buf).to_string();
+    socket.write_u8(1).await?;
     let mut tail_pos = (
         (head_pos.0 as i16 - movement_adder.0) as usize,
         (head_pos.1 as i16 - movement_adder.1) as usize,
@@ -127,14 +135,18 @@ pub async fn clinet_tasks(
         //     pieces: vec![()]
 
         // }
+        buf = [0_u8; 500];
         let len = socket.read(&mut buf).await?;
-        let recieved_data = String::from_utf8_lossy(&buf);
-        let recieved_data = serde_json::from_str::<UserInputData>(&recieved_data)?;
+        let recieved_data = String::from_utf8_lossy(&buf[..len]);
+
+        let recieved_data = serde_json::from_str::<ClientSendData>(&recieved_data)?;
+        println!("bib",);
         let command = recieved_data.command;
         let terminal_size = recieved_data.terminal_size;
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
+
         let pieces_pos = snake.move_forward();
         if let Err(e) =
             snake_status_check(&pieces_pos.last().unwrap(), playground.clone(), &mut snake)
@@ -149,15 +161,15 @@ pub async fn clinet_tasks(
             &terminal_size,
         )?;
         tx.send(pieces_pos).await?;
-        let data_send = serde_json::to_string(&UserOutputData {
+        let data_send = serde_json::to_string(&HostSideData {
             display_data,
             status: "nothing".to_string(),
         })?;
-        socket.write(data_send.as_bytes()).await;
+        socket.write(data_send.as_bytes()).await?;
 
         //let async_tx = tx.clone();
         //let user_screen = println!("{}", String::from_utf8_lossy(&buf[..len]));
-        wait_handler.await;
+        wait_handler.await?;
     }
 
     Ok(())
@@ -179,15 +191,16 @@ fn user_display_generator(
     } else if (terminal_size.1 - 1 + conversion_vector.1).saturating_sub(snake_head.1) == 2 {
         *conversion_vector = (conversion_vector.0, conversion_vector.1 + 1);
     }
-    let mut data = String::with_capacity(5000);
-    for x in 0..terminal_size.0 {
-        for y in 0..terminal_size.1 {
+    let mut data = String::new();
+    for y in 0..terminal_size.1 {
+        for x in 0..terminal_size.0 {
             data.push(
                 playground[(x + conversion_vector.0) as usize][(y + conversion_vector.1) as usize],
             );
-            data.push('\n');
         }
+        //data.push('\n');
     }
+    // println!("{data}");
     Ok(data)
 }
 fn generate_head_location(playground_size: (usize, usize)) -> (usize, usize) {
@@ -210,4 +223,20 @@ fn snake_status_check(
     }
 
     Ok(())
+}
+fn start(playground: Arc<RwLock<Box<[Box<[char]>]>>>) {
+    let mut cloned_playground = {
+        let guard = playground.read().unwrap();
+        (*guard).clone()
+    };
+    let len = (cloned_playground.len(), cloned_playground[0].len());
+    for x in 0..len.0 {
+        cloned_playground[x][0] = '#';
+        cloned_playground[x][len.1 - 1] = '#';
+    }
+    for y in 0..len.1 {
+        cloned_playground[0][y] = '#';
+        cloned_playground[len.0 - 1][y] = '#';
+    }
+    *playground.write().unwrap() = cloned_playground;
 }

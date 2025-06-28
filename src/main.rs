@@ -6,7 +6,7 @@ use crossterm::{
     terminal::{LeaveAlternateScreen, disable_raw_mode},
 };
 //use snake::game::snake;
-use snakecli::{self, game, server::host::main_host};
+use snakecli::{self, client::user::main_client, game, server::host::main_host};
 #[tokio::main]
 async fn main() {
     let matches = Command::new("snake")
@@ -23,15 +23,15 @@ async fn main() {
                     Arg::new("height")
                         .short('H')
                         .long("height")
-                        .default_value("200")
-                        .help("Playground height size which players play on it default is: 200"),
+                        .default_value("100")
+                        .help("Playground height size which players play on it default is: 100"),
                 )
                 .arg(
                     Arg::new("width")
                         .short('W')
                         .long("width")
-                        .default_value("100")
-                        .help("Playground width size which players play on it default is: 100"),
+                        .default_value("200")
+                        .help("Playground width size which players play on it default is: 200"),
                 )
                 .about("Create a server that clients connect to it"),
         )
@@ -62,6 +62,7 @@ async fn main() {
         Some(("host", arg)) => host(arg).await,
         // Some(("client", arg)) => client(arg),
         Some(("solo", _)) => solo().await,
+        Some(("client", arg)) => client(arg).await,
         _ => exit(0),
     };
     // disable_raw_mode().unwrap();
@@ -83,7 +84,11 @@ async fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
     //println!("left");
     Ok(())
 }
-fn client(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
+async fn client(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
+    let addr = arg.get_one::<String>("ip").unwrap();
+    let name = arg.get_one::<String>("name").unwrap();
+    main_client(name, addr).await?;
+
     Ok(())
 }
 async fn solo() -> Result<(), Box<dyn (std::error::Error)>> {

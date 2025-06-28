@@ -10,14 +10,14 @@ pub struct BodyPieces {
     pub direction: Direction,
     pub coordinate: (u16, u16),
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy)]
 pub enum Direction {
     Up,
     Down,
     Left,
     Right,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum CommandKeys {
     Directions(Direction),
     EatFood,

@@ -15,11 +15,17 @@ use std::{
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
+    join,
     net::{TcpListener, TcpStream},
     runtime::Runtime,
     sync::mpsc::{self, Receiver, Sender},
     time::{error::Error, sleep},
 };
+pub struct SnakeChanges {
+    pub new_head: (u16, u16),
+    pub previous_head: (u16, u16),
+    pub removed_tail: (u16, u16),
+}
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ClientSendData {
     pub terminal_size: (u16, u16),
@@ -30,10 +36,14 @@ pub struct HostSideData {
     pub display_data: String,
     pub status: String,
 }
-pub async fn main_host(size: (u16, u16), addr: &str) -> Result<(), Box<dyn (std::error::Error)>> {
-    let (tx, rx) = mpsc::channel::<Vec<(u16, u16)>>(300);
+pub async fn main_host(
+    playground_size: (u16, u16),
+    addr: &str,
+) -> Result<(), Box<dyn (std::error::Error)>> {
+    let (tx, rx) = mpsc::channel::<SnakeChanges>(300);
     let playground = Arc::new(RwLock::new(
-        vec![vec![' '; size.1 as usize].into_boxed_slice(); size.0 as usize].into_boxed_slice(),
+        vec![vec![' '; playground_size.1 as usize].into_boxed_slice(); playground_size.0 as usize]
+            .into_boxed_slice(),
     ));
     start(playground.clone());
     let listener = TcpListener::bind(addr).await?;
@@ -48,63 +58,67 @@ pub async fn main_host(size: (u16, u16), addr: &str) -> Result<(), Box<dyn (std:
             //let thread_playground = async_playground.clone();
             thread::spawn(move || {
                 let rt = Runtime::new().unwrap();
-                rt.block_on(async { clinet_tasks(thread_tx, socket, thread_playground).await })
-                    .unwrap();
+                rt.block_on(async {
+                    clinet_tasks(thread_tx, socket, thread_playground, &playground_size).await
+                })
+                .unwrap();
             });
 
             //a.join();
         }
     });
 
-    update_playground(playground, rx).await;
+    update_playground(playground, rx, &playground_size).await;
     Ok(())
 }
 async fn update_playground(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
-    mut rx: Receiver<Vec<(u16, u16)>>,
+    mut rx: Receiver<SnakeChanges>,
+    playground_size: &(u16, u16),
 ) {
     let mut cloned_playground = {
         let guard = playground.read().unwrap();
         (*guard).clone()
     };
     //let mut playground = playground.write().unwrap();
-    let (width, height) = { (cloned_playground.len(), cloned_playground[0].len()) };
+    //let (width, height) = (playground_size.0 as usize, playground_size.1 as usize);
     loop {
-        let pieces_pos = rx.recv().await.unwrap();
-        println!("recieved from channel");
-        for x in 1..width {
-            for y in 1..height {
-                if cloned_playground[x][y].is_digit(10) {
-                    continue;
-                }
-                cloned_playground[x][y] = ' ';
-            }
-        }
-        let len = pieces_pos.len();
-        for (index, &(x, y)) in pieces_pos.iter().enumerate() {
-            if index == len - 1 {
-                cloned_playground[x as usize][y as usize] = 'X';
-                continue;
-            }
-            cloned_playground[x as usize][y as usize] = 'O';
-        }
+        let snake_changes = rx.recv().await.unwrap();
+        let removed_tail = snake_changes.removed_tail;
+        let new_head = snake_changes.new_head;
+        let previous_head = snake_changes.previous_head;
+        //println!("recieved from channel");
+        // for x in 1..width - 1 {
+        //     for y in 1..height - 1 {
+        //         if cloned_playground[x][y].is_digit(10) {
+        //             continue;
+        //         }
+        //         cloned_playground[x][y] = ' ';
+        //     }
+        // }
+        cloned_playground[removed_tail.0 as usize][removed_tail.1 as usize] = ' ';
+        cloned_playground[previous_head.0 as usize][previous_head.1 as usize] = 'O';
+        cloned_playground[new_head.0 as usize][new_head.1 as usize] = 'X';
+        // let len = pieces_pos.len();
+        // for (index, &(x, y)) in pieces_pos.iter().enumerate() {
+        //     if index == len - 1 {
+        //         cloned_playground[x as usize][y as usize] = 'X';
+        //         continue;
+        //     }
+        //     cloned_playground[x as usize][y as usize] = 'O';
+        // }
         *playground.write().unwrap() = cloned_playground.clone();
     }
 }
 //pub async fn wait_for_connect()
 pub async fn clinet_tasks(
-    tx: Sender<Vec<(u16, u16)>>,
+    tx: Sender<SnakeChanges>,
     mut socket: TcpStream,
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
+    playground_size: &(u16, u16),
 ) -> Result<(), Box<dyn (std::error::Error)>> {
     let mut buf = [0_u8; 500];
     println!("a user entered");
-    let playground_size = {
-        (
-            playground.read().unwrap().len(),
-            playground.read().unwrap()[0].len(),
-        )
-    };
 
     let movement_adder = (-1, 0);
     let mut head_pos = (0, 0);
@@ -116,21 +130,23 @@ pub async fn clinet_tasks(
         (head_pos.0 as i16 - movement_adder.0) as usize,
         (head_pos.1 as i16 - movement_adder.1) as usize,
     );
-    let readable_playground = playground.read().unwrap();
-    while readable_playground[head_pos.0][head_pos.1] != ' '
-        || readable_playground[tail_pos.0][tail_pos.1] != ' '
     {
-        head_pos = generate_head_location(playground_size);
-        tail_pos = (
-            (head_pos.0 as i16 - movement_adder.0) as usize,
-            (head_pos.1 as i16 - movement_adder.1) as usize,
-        );
+        let readable_playground = playground.read().unwrap();
+        while readable_playground[head_pos.0][head_pos.1] != ' '
+            || readable_playground[tail_pos.0][tail_pos.1] != ' '
+        {
+            head_pos =
+                generate_head_location((playground_size.0 as usize, playground_size.1 as usize));
+            tail_pos = (
+                (head_pos.0 as i16 - movement_adder.0) as usize,
+                (head_pos.1 as i16 - movement_adder.1) as usize,
+            );
+        }
     }
-    drop(readable_playground);
     let terminal_size = command.terminal_size;
     let mut conversion_vector = (
-        head_pos.0.saturating_sub(terminal_size.0 as usize) as u16 + 3,
-        head_pos.1.saturating_sub(terminal_size.1 as usize) as u16 + 3,
+        head_pos.0.saturating_sub(terminal_size.0 as usize + 3) as u16,
+        head_pos.1.saturating_sub(terminal_size.1 as usize + 3) as u16,
     );
 
     let mut snake = SnakeBody {
@@ -151,17 +167,17 @@ pub async fn clinet_tasks(
         // }
         buf = [0_u8; 500];
         let len = socket.read(&mut buf).await?;
-        let recieved_data = String::from_utf8_lossy(&buf[..len]);
+        let recieved_data =
+            serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]))?;
 
-        let recieved_data = serde_json::from_str::<ClientSendData>(&recieved_data)?;
         let command = recieved_data.command;
         let terminal_size = recieved_data.terminal_size;
-        println!("{:?}", command);
+        //println!("{:?}", command);
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
 
-        let pieces_pos = snake.move_forward();
+        let (pieces_pos, removed_tail) = snake.move_forward();
         if let Err(e) =
             snake_status_check(&pieces_pos.last().unwrap(), playground.clone(), &mut snake)
         {
@@ -174,7 +190,9 @@ pub async fn clinet_tasks(
             &mut conversion_vector,
             &terminal_size,
         )?;
-        tx.send(pieces_pos).await?;
+        //tx.send(pieces_pos).await?;
+        let async_tx = tx.clone();
+        let mpsc_handler = tokio::spawn(async move { async_tx.send(removed_tail).await });
         let data_send = serde_json::to_string(&HostSideData {
             display_data,
             status: "nothing".to_string(),
@@ -183,7 +201,7 @@ pub async fn clinet_tasks(
 
         //let async_tx = tx.clone();
         //let user_screen = println!("{}", String::from_utf8_lossy(&buf[..len]));
-        wait_handler.await?;
+        let _ = join!(wait_handler, mpsc_handler);
     }
 
     Ok(())
@@ -194,7 +212,11 @@ fn user_display_generator(
     conversion_vector: &mut (u16, u16),
     terminal_size: &(u16, u16),
 ) -> Result<String, Box<dyn (std::error::Error)>> {
-    let playground = playground.read().unwrap();
+    let cloned_playground = {
+        let gaurd = playground.read().unwrap();
+        (*gaurd).clone()
+    };
+
     let snake_head = pieces_pos.last().unwrap();
     if snake_head.0.saturating_sub(conversion_vector.0) == 2 {
         *conversion_vector = (conversion_vector.0.saturating_sub(1), conversion_vector.1);
@@ -209,11 +231,13 @@ fn user_display_generator(
     for y in 0..terminal_size.1 {
         for x in 0..terminal_size.0 {
             data.push(
-                playground[(x + conversion_vector.0) as usize][(y + conversion_vector.1) as usize],
+                cloned_playground[(x + conversion_vector.0) as usize]
+                    [(y + conversion_vector.1) as usize],
             );
         }
         //data.push('\n');
     }
+    //*playground.write().unwrap() = cloned_playground;
     //println!("{:?}", pieces_pos.last().unwrap());
     // println!("{data}");
     Ok(data)
@@ -230,7 +254,6 @@ fn snake_status_check(
     snake: &mut SnakeBody,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
     let character = playground.read().unwrap()[head.0 as usize][head.1 as usize];
-    println!("bib",);
     if character == '#' || character == 'O' || character == 'X' {
         Err("loose")?;
     }

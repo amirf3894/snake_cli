@@ -32,15 +32,15 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     let command = Arc::new(RwLock::new(CommandKeys::None));
     tokio::spawn(read_key_to_command(command.clone()));
     loop {
-        let terminal_size = size()?;
-        let command_to_send: Arc<RwLock<CommandKeys>> = command.clone();
+        //let terminal_size = size()?;
+
         let command_to_send = {
-            let gurad = command_to_send.read().unwrap();
+            let gurad = command.read().unwrap();
             (*gurad).clone()
         };
         *command.write().unwrap() = CommandKeys::None;
         let data = serde_json::to_string(&ClientSendData {
-            terminal_size,
+            terminal_size: size()?,
             command: command_to_send,
         })?;
         stream.write(data.as_bytes()).await?;

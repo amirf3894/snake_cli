@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+
+use crate::server::host::SnakeChanges;
 #[derive(Clone)]
 pub struct SnakeBody {
     pub len: usize,
@@ -50,9 +52,9 @@ impl SnakeBody {
         }
         self.movement_adder = new_movement_adder;
     }
-    pub fn move_forward(&mut self) -> Vec<(u16, u16)> {
+    pub fn move_forward(&mut self) -> (Vec<(u16, u16)>, SnakeChanges) {
         let &previous_head = self.pieces.get(self.len - 1).unwrap();
-        self.pieces.remove(0);
+        let removed_tail = self.pieces.remove(0);
         let new_head = (
             (previous_head.0 as i16 + self.movement_adder.0)
                 .try_into()
@@ -62,7 +64,14 @@ impl SnakeBody {
                 .unwrap_or(0),
         );
         self.pieces.push(new_head);
-        self.pieces.clone()
+        (
+            self.pieces.clone(),
+            SnakeChanges {
+                new_head,
+                previous_head,
+                removed_tail,
+            },
+        )
     }
     pub fn eat_food(&mut self) {
         let &head = self.pieces.last().unwrap();

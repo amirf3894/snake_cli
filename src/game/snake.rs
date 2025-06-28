@@ -38,7 +38,7 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
             snake.clone().lock().unwrap().change_direction(direction);
             //*command.write().unwrap() = CommandKeys::None;
         }
-        let pieces_pos = snake.clone().lock().unwrap().move_forward();
+        let (pieces_pos, _) = snake.clone().lock().unwrap().move_forward();
         snake_status_check(
             &pieces_pos.last().unwrap(),
             &playground,

@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 pub struct SnakeBody {
     pub len: usize,
@@ -9,14 +10,14 @@ pub struct BodyPieces {
     pub direction: Direction,
     pub coordinate: (u16, u16),
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Direction {
     Up,
     Down,
     Left,
     Right,
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum CommandKeys {
     Directions(Direction),
     EatFood,

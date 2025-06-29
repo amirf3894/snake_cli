@@ -212,6 +212,7 @@ fn user_display_generator(
         let gaurd = playground.read().unwrap();
         (*gaurd).clone()
     };
+    let playground_len = (cloned_playground.len(), cloned_playground[0].len());
     let gap = (terminal_size.0 / 5, terminal_size.1 / 5);
     //let snake_head = pieces_pos.last().unwrap();
     if snake_head.0.saturating_sub(conversion_vector.0) < gap.0 {
@@ -220,17 +221,18 @@ fn user_display_generator(
     if snake_head.1.saturating_sub(conversion_vector.1) < gap.1 {
         conversion_vector.1 = snake_head.1.saturating_sub(gap.1);
     }
+
     if (terminal_size.0 + conversion_vector.0).saturating_sub(snake_head.0) < gap.0 {
-        conversion_vector.0 = snake_head
-            .0
-            .saturating_add(gap.0)
-            .saturating_sub(terminal_size.0);
+        conversion_vector.0 = snake_head.0.saturating_sub(terminal_size.0 - gap.0);
+        if snake_head.0 + gap.0 > playground_len.0 as u16 {
+            conversion_vector.0 = (playground_len.0 as u16) - terminal_size.0;
+        }
     }
     if (terminal_size.1 + conversion_vector.1).saturating_sub(snake_head.1) < gap.1 {
-        conversion_vector.1 = snake_head
-            .1
-            .saturating_add(gap.1)
-            .saturating_sub(terminal_size.1);
+        conversion_vector.1 = snake_head.1.saturating_sub(terminal_size.1 - gap.1);
+        if snake_head.1 + gap.1 > playground_len.1 as u16 {
+            conversion_vector.1 = (playground_len.1 as u16) - terminal_size.1;
+        }
     }
 
     // if snake_head.0.saturating_sub(conversion_vector.0) == 2 {

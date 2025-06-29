@@ -143,7 +143,7 @@ pub async fn clinet_tasks(
             );
         }
     }
-    let terminal_size = command.terminal_size;
+    //let terminal_size = command.terminal_size;
 
     let mut snake = SnakeBody {
         len: 2,
@@ -155,7 +155,7 @@ pub async fn clinet_tasks(
     };
 
     loop {
-        let wait_handler = tokio::spawn(sleep(Duration::from_millis(200)));
+        let wait_handler = tokio::spawn(sleep(Duration::from_millis(1200)));
         // let mut snake = SnakeBody{
         //     len : 2,
         //     pieces: vec![()]
@@ -167,29 +167,28 @@ pub async fn clinet_tasks(
             serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]))?;
 
         let command = recieved_data.command;
+        println!("{:?}", command);
         let terminal_size = recieved_data.terminal_size;
         //println!("{:?}", command);
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
 
-        let (pieces_pos, removed_tail) = snake.move_forward();
-        if let Err(e) =
-            snake_status_check(&pieces_pos.last().unwrap(), playground.clone(), &mut snake)
+        let (_, snake_changes) = snake.move_forward();
+        if let Err(e) = snake_status_check(&snake_changes.new_head, playground.clone(), &mut snake)
         {
             println!("{}", e.to_string());
             break;
         }
         let display_data = user_display_generator(
             playground.clone(),
-            &pieces_pos,
+            &snake_changes.new_head,
             &mut conversion_vector,
             &terminal_size,
-            &mut socket,
         )?;
         //tx.send(pieces_pos).await?;
         let async_tx = tx.clone();
-        let mpsc_handler = tokio::spawn(async move { async_tx.send(removed_tail).await });
+        let mpsc_handler = tokio::spawn(async move { async_tx.send(snake_changes).await });
         let data_send = serde_json::to_string(&HostSideData {
             display_data,
             status: "nothing".to_string(),
@@ -205,17 +204,16 @@ pub async fn clinet_tasks(
 }
 fn user_display_generator(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
-    pieces_pos: &Vec<(u16, u16)>,
+    snake_head: &(u16, u16),
     conversion_vector: &mut (u16, u16),
     terminal_size: &(u16, u16),
-    socket: &mut TcpStream,
 ) -> Result<String, Box<dyn (std::error::Error)>> {
     let cloned_playground = {
         let gaurd = playground.read().unwrap();
         (*gaurd).clone()
     };
     let gap = (terminal_size.0 / 5, terminal_size.1 / 5);
-    let snake_head = pieces_pos.last().unwrap();
+    //let snake_head = pieces_pos.last().unwrap();
     if snake_head.0.saturating_sub(conversion_vector.0) < gap.0 {
         conversion_vector.0 = snake_head.0.saturating_sub(gap.0);
     }

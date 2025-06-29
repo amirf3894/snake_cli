@@ -4,7 +4,7 @@ use crate::game::{
     snake::{self},
 };
 use clap::{self};
-use rand::{rand_core::le, random_range};
+use rand::{rand_core::le, random_range, rng, seq::IndexedRandom};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
@@ -155,7 +155,7 @@ pub async fn clinet_tasks(
     };
 
     loop {
-        let wait_handler = tokio::spawn(sleep(Duration::from_millis(1200)));
+        let wait_handler = tokio::spawn(sleep(Duration::from_millis(200)));
         // let mut snake = SnakeBody{
         //     len : 2,
         //     pieces: vec![()]
@@ -305,5 +305,20 @@ fn start(playground: Arc<RwLock<Box<[Box<[char]>]>>>) {
         cloned_playground[0][y] = '#';
         cloned_playground[len.0 - 1][y] = '#';
     }
+    (0..(len.0 * len.1 / 100)).for_each(|_| add_food(&mut cloned_playground));
     *playground.write().unwrap() = cloned_playground;
+}
+fn add_food(playground: &mut Box<[Box<[char]>]>) {
+    const FOODS: [u8; 15] = [1, 1, 1, 1, 2, 2, 3, 3, 5, 5, 5, 7, 8, 8, 9];
+    let mut x = 0;
+    let mut y = 0;
+    let width = playground.len();
+    let height = playground[0].len();
+    while playground[x][y] != ' ' {
+        x = random_range(1..width - 1);
+        y = random_range(1..height - 1);
+    }
+    let mut rng = rng();
+    let &food = FOODS.choose(&mut rng).unwrap();
+    playground[x][y] = std::char::from_digit(food as u32, 10).unwrap();
 }

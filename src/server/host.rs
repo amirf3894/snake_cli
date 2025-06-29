@@ -119,7 +119,7 @@ pub async fn clinet_tasks(
 ) -> Result<(), Box<dyn (std::error::Error)>> {
     let mut buf = [0_u8; 500];
     println!("a user entered");
-
+    let mut conversion_vector = (0, 0);
     let movement_adder = (-1, 0);
     let mut head_pos = (0, 0);
     let len = socket.read(&mut buf).await?;
@@ -144,10 +144,6 @@ pub async fn clinet_tasks(
         }
     }
     let terminal_size = command.terminal_size;
-    let mut conversion_vector = (
-        head_pos.0.saturating_sub(terminal_size.0 as usize + 3) as u16,
-        head_pos.1.saturating_sub(terminal_size.1 as usize + 3) as u16,
-    );
 
     let mut snake = SnakeBody {
         len: 2,
@@ -216,17 +212,36 @@ fn user_display_generator(
         let gaurd = playground.read().unwrap();
         (*gaurd).clone()
     };
-
+    let gap = (terminal_size.0 / 5, terminal_size.1 / 5);
     let snake_head = pieces_pos.last().unwrap();
-    if snake_head.0.saturating_sub(conversion_vector.0) == 2 {
-        *conversion_vector = (conversion_vector.0.saturating_sub(1), conversion_vector.1);
-    } else if snake_head.1.saturating_sub(conversion_vector.1) == 2 {
-        *conversion_vector = (conversion_vector.0, conversion_vector.1.saturating_sub(1));
-    } else if (terminal_size.0 - 1 + conversion_vector.0).saturating_sub(snake_head.0) == 2 {
-        *conversion_vector = (conversion_vector.0 + 1, conversion_vector.1);
-    } else if (terminal_size.1 - 1 + conversion_vector.1).saturating_sub(snake_head.1) == 2 {
-        *conversion_vector = (conversion_vector.0, conversion_vector.1 + 1);
+    if snake_head.0.saturating_sub(conversion_vector.0) < gap.0 {
+        conversion_vector.0 = snake_head.0.saturating_sub(gap.0);
     }
+    if snake_head.1.saturating_sub(conversion_vector.1) < gap.1 {
+        conversion_vector.1 = snake_head.1.saturating_sub(gap.1);
+    }
+    if (terminal_size.0 + conversion_vector.0).saturating_sub(snake_head.0) < gap.0 {
+        conversion_vector.0 = snake_head
+            .0
+            .saturating_add(gap.0)
+            .saturating_sub(terminal_size.0);
+    }
+    if (terminal_size.1 + conversion_vector.1).saturating_sub(snake_head.1) < gap.1 {
+        conversion_vector.1 = snake_head
+            .1
+            .saturating_add(gap.1)
+            .saturating_sub(terminal_size.1);
+    }
+
+    // if snake_head.0.saturating_sub(conversion_vector.0) == 2 {
+    //     *conversion_vector = (conversion_vector.0.saturating_sub(1), conversion_vector.1);
+    // } else if snake_head.1.saturating_sub(conversion_vector.1) == 2 {
+    //     *conversion_vector = (conversion_vector.0, conversion_vector.1.saturating_sub(1));
+    // } else if (terminal_size.0 - 1 + conversion_vector.0).saturating_sub(snake_head.0) == 2 {
+    //     *conversion_vector = (conversion_vector.0 + 1, conversion_vector.1);
+    // } else if (terminal_size.1 - 1 + conversion_vector.1).saturating_sub(snake_head.1) == 2 {
+    //     *conversion_vector = (conversion_vector.0, conversion_vector.1 + 1);
+    // }
     let mut data = String::new();
     for y in 0..terminal_size.1 {
         for x in 0..terminal_size.0 {

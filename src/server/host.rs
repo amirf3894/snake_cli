@@ -185,6 +185,7 @@ pub async fn clinet_tasks(
             &pieces_pos,
             &mut conversion_vector,
             &terminal_size,
+            &mut socket,
         )?;
         //tx.send(pieces_pos).await?;
         let async_tx = tx.clone();
@@ -207,6 +208,7 @@ fn user_display_generator(
     pieces_pos: &Vec<(u16, u16)>,
     conversion_vector: &mut (u16, u16),
     terminal_size: &(u16, u16),
+    socket: &mut TcpStream,
 ) -> Result<String, Box<dyn (std::error::Error)>> {
     let cloned_playground = {
         let gaurd = playground.read().unwrap();
@@ -242,16 +244,29 @@ fn user_display_generator(
     // } else if (terminal_size.1 - 1 + conversion_vector.1).saturating_sub(snake_head.1) == 2 {
     //     *conversion_vector = (conversion_vector.0, conversion_vector.1 + 1);
     // }
+    // let mut data = String::new();
+    // for y in 0..terminal_size.1 {
+    //     for x in 0..terminal_size.0 {
+    //         data.push(
+    //             cloned_playground[(x + conversion_vector.0) as usize]
+    //                 [(y + conversion_vector.1) as usize],
+    //         );
+    //     }
+    //     //data.push('\n');
+    // }
+
+    // let mut data = [0_u8; 5000];
+    // let mut index = 0;
     let mut data = String::new();
-    for y in 0..terminal_size.1 {
-        for x in 0..terminal_size.0 {
+    (0..terminal_size.1).for_each(|y| {
+        (0..terminal_size.0).for_each(|x| {
             data.push(
                 cloned_playground[(x + conversion_vector.0) as usize]
                     [(y + conversion_vector.1) as usize],
             );
-        }
-        //data.push('\n');
-    }
+        });
+    });
+    // [..terminal_size.1].iter().for_each(|y| [..terminal_size.0].fore);
     //*playground.write().unwrap() = cloned_playground;
     //println!("{:?}", pieces_pos.last().unwrap());
     // println!("{data}");

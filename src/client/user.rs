@@ -47,9 +47,9 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
         let len = stream.read(&mut buff).await?;
         let data = serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))?;
 
-        execute!(stdout, MoveTo(0, 0), Clear(ClearType::All))?;
+        execute!(stdout, MoveTo(0, 0),)?;
         write!(stdout, "{}", data.display_data)?;
-        //stdout.flush()?;
+        stdout.flush()?;
     }
     //TcpStream
 }

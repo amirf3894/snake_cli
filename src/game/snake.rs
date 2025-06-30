@@ -179,7 +179,7 @@ fn display_playground(
     Ok(())
 }
 
-pub async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
+async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
     //~*command.write().unwrap() = CommandKeys::None
     loop {
         if !command.read().unwrap().is_none() {
@@ -205,6 +205,7 @@ pub async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
             _ => continue,
         };
         *command.write().unwrap() = new_command;
+        // print!("command");
         // return;
     }
 }

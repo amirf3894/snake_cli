@@ -155,7 +155,7 @@ pub async fn clinet_tasks(
     };
 
     loop {
-        let wait_handler = tokio::spawn(sleep(Duration::from_millis(1200)));
+        let wait_handler = tokio::spawn(sleep(Duration::from_millis(200)));
         // let mut snake = SnakeBody{
         //     len : 2,
         //     pieces: vec![()]

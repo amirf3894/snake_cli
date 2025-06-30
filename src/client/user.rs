@@ -38,6 +38,7 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     tokio::spawn(read_key_to_command(tx));
     loop {
         let command = rx.try_recv().unwrap_or(CommandKeys::None);
+        //print!("{:?}", command);
         //let terminal_size = size()?;
 
         // let command_to_send = {
@@ -55,13 +56,14 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
 
         execute!(stdout, MoveTo(0, 0),)?;
         write!(stdout, "{}", data.display_data)?;
+
         stdout.flush()?;
     }
     //TcpStream
 }
 async fn read_key_to_command(tx: Sender<CommandKeys>) {
-    let key_event = read().unwrap();
     loop {
+        let key_event = read().unwrap();
         let new_command = match key_event.as_key_press_event().unwrap().code {
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 CommandKeys::Directions(Direction::Up)
@@ -80,6 +82,8 @@ async fn read_key_to_command(tx: Sender<CommandKeys>) {
             _ => continue,
         };
         tx.send(new_command).unwrap();
+        // println!("pressed");
+        //stdout().flush().unwrap();
     }
 
     // print!("command");

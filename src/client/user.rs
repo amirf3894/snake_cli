@@ -20,12 +20,12 @@ use tokio::{
 pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::error::Error)>> {
     let mut buff = [0_u8; 10_000];
     let mut stream = TcpStream::connect(addr).await?;
-    let data = serde_json::to_string(&ClientSendData {
-        terminal_size: size().unwrap(),
-        command: CommandKeys::None,
-    })?;
-    stream.write(data.as_bytes()).await?;
-    let _ = stream.read_u8().await;
+    // let data = serde_json::to_string(&ClientSendData {
+    //     terminal_size: size().unwrap(),
+    //     command: CommandKeys::None,
+    // })?;
+    //stream.write(data.as_bytes()).await?;
+    // let _ = stream.read_u8().await;
     enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;

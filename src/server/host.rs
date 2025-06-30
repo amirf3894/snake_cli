@@ -117,15 +117,15 @@ pub async fn clinet_tasks(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
     playground_size: &(u16, u16),
 ) -> Result<(), Box<dyn (std::error::Error)>> {
-    let mut buf = [0_u8; 500];
+    let mut buf;
     println!("a user entered");
     let mut conversion_vector = (0, 0);
     let movement_adder = (-1, 0);
     let mut head_pos = (0, 0);
-    let len = socket.read(&mut buf).await?;
-    let mut command =
-        serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]).to_string())?;
-    socket.write_u8(1).await?;
+    //let len = socket.read(&mut buf).await?;
+    // let mut command =
+    //     serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]).to_string())?;
+    //socket.write_u8(1).await?;
     let mut tail_pos = (
         (head_pos.0 as i16 - movement_adder.0) as usize,
         (head_pos.1 as i16 - movement_adder.1) as usize,
@@ -155,7 +155,7 @@ pub async fn clinet_tasks(
     };
 
     loop {
-        let wait_handler = tokio::spawn(sleep(Duration::from_millis(200)));
+        let wait_handler = tokio::spawn(sleep(Duration::from_millis(1200)));
         // let mut snake = SnakeBody{
         //     len : 2,
         //     pieces: vec![()]
@@ -167,7 +167,7 @@ pub async fn clinet_tasks(
             serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]))?;
 
         let command = recieved_data.command;
-        println!("{:?}", command);
+        //println!("{:?}", command);
         let terminal_size = recieved_data.terminal_size;
         //println!("{:?}", command);
         if let CommandKeys::Directions(direction) = command {
@@ -208,10 +208,11 @@ fn user_display_generator(
     conversion_vector: &mut (u16, u16),
     terminal_size: &(u16, u16),
 ) -> Result<String, Box<dyn (std::error::Error)>> {
-    let cloned_playground = {
-        let gaurd = playground.read().unwrap();
-        (*gaurd).clone()
-    };
+    // let cloned_playground = {
+    //     let gaurd = playground.read().unwrap();
+    //     (*gaurd).clone()
+    // };
+    let cloned_playground = playground.read().unwrap();
     let playground_len = (cloned_playground.len(), cloned_playground[0].len());
     let gap = (terminal_size.0 / 5, terminal_size.1 / 5);
     //let snake_head = pieces_pos.last().unwrap();

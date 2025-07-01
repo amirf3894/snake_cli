@@ -1,6 +1,7 @@
 use crate::{
     game::{
-        self, init,
+        self,
+        init::{self, end},
         model::{CommandKeys, Direction},
     },
     server::host::{ClientSendData, GameStatus, HostSideData},
@@ -15,6 +16,7 @@ use crossterm::{
 };
 use std::{
     io::{Write, stdout},
+    process::exit,
     sync::{Arc, RwLock, mpsc::Sender},
     thread::sleep,
     time::Duration,
@@ -93,6 +95,13 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
         write!(stdout, "{}", host_side_data.display_data)?;
 
         stdout.flush()?;
+        if let GameStatus::Dead = host_side_data.status {
+            // execute!(stdout, MoveTo((size()?.0 - 9) / 2, (size()?.1) / 2))?;
+            // println!("you loose");
+            end("you loose", &mut stdout)?;
+
+            exit(0);
+        }
     }
     //TcpStream
 }

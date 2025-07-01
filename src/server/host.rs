@@ -8,6 +8,7 @@ use rand::{rand_core::le, random_range, rng, seq::IndexedRandom};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
+    process::exit,
     sync::{Arc, RwLock},
     thread,
     time::Duration,
@@ -166,7 +167,8 @@ pub async fn clinet_tasks(
         ],
         movement_adder,
     };
-
+    let mut host_side_data;
+    let mut client_side_data;
     loop {
         //let wait_handler = tokio::spawn(sleep(Duration::from_millis(1200)));
         // let mut snake = SnakeBody{
@@ -176,19 +178,19 @@ pub async fn clinet_tasks(
         // }
         buf = [0_u8; 500];
         let len = socket.read(&mut buf).await?;
-        let recieved_data =
+        client_side_data =
             serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]))?;
 
         // sleep(Duration::from_secs(1)).await;
-        let command = recieved_data.command;
+        let command = client_side_data.command;
         //println!("{:?}", command);
-        let terminal_size = recieved_data.terminal_size;
+        let terminal_size = client_side_data.terminal_size;
         //println!("{:?}", command);
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
         let (_, mut playground_changes) = snake.move_forward();
-        if recieved_data.loose_weight {
+        if client_side_data.loose_weight {
             playground_changes.remove_char.push(snake.pieces.remove(0));
             snake.len -= 1;
         }
@@ -199,20 +201,31 @@ pub async fn clinet_tasks(
             &terminal_size,
         )?;
         //tx.send(pieces_pos).await?;
-        let data_send = serde_json::to_string(&HostSideData {
+        host_side_data = HostSideData {
             display_data,
             status: GameStatus::Alive,
             len: snake.len,
-        })?;
-        socket.write(data_send.as_bytes()).await?;
+        };
         if let Err(e) = snake_status_check(
             &playground_changes.change_to_x.get(0).unwrap(),
             playground.clone(),
             &mut snake,
         ) {
-            println!("{}", e.to_string());
+            host_side_data.status = GameStatus::Dead;
+            socket
+                .write(serde_json::to_string(&host_side_data)?.as_bytes())
+                .await?;
+            playground_changes.remove_char = snake.pieces;
+            playground_changes.remove_char.pop(); //without this line a place where head imapcted would cleared 
+            playground_changes.chage_to_o.clear();
+            playground_changes.change_to_x.clear();
+            //loose(&mut playground_changes, snake);
+            tx.send(playground_changes).await?;
             break;
         }
+        socket
+            .write(serde_json::to_string(&host_side_data)?.as_bytes())
+            .await?;
 
         let async_tx = tx.clone();
         let mpsc_handler = tokio::spawn(async move { async_tx.send(playground_changes).await });
@@ -332,6 +345,9 @@ fn start(playground: Arc<RwLock<Box<[Box<[char]>]>>>) {
     (0..(len.0 * len.1 / 100)).for_each(|_| add_food(&mut cloned_playground));
     *playground.write().unwrap() = cloned_playground;
 }
+// fn loose(playground_changes: &mut PlaygroundChanges, snake: SnakeBody) {
+//     playground_changes.remove_char = snake.pieces;
+// }
 
 fn add_food(playground: &mut Box<[Box<[char]>]>) {
     const FOODS: [u8; 15] = [1, 1, 1, 1, 2, 2, 3, 3, 5, 5, 5, 7, 8, 8, 9];

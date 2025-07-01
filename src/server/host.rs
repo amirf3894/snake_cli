@@ -324,6 +324,9 @@ fn snake_status_check(
     }
     if let Some(n) = character.to_digit(10) {
         (0..n).for_each(|_| snake.eat_food());
+        let mut cloned_playground = { (*playground.read().unwrap()).clone() };
+        add_food(&mut cloned_playground);
+        *playground.write().unwrap() = cloned_playground;
     }
 
     Ok(())

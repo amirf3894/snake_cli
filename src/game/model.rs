@@ -1,3 +1,5 @@
+use std::vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::server::host::PlaygroundChanges;
@@ -70,6 +72,7 @@ impl SnakeBody {
                 change_to_x: vec![new_head],
                 chage_to_o: vec![previous_head],
                 remove_char: vec![removed_tail],
+                add_food: vec![],
             },
         )
     }

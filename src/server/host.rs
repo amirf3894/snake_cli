@@ -26,6 +26,7 @@ pub struct PlaygroundChanges {
     pub change_to_x: Vec<(u16, u16)>,
     pub chage_to_o: Vec<(u16, u16)>,
     pub remove_char: Vec<(u16, u16)>,
+    pub add_food: Vec<((u16, u16), char)>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ClientSendData {
@@ -95,6 +96,7 @@ async fn update_playground(
         let remove_char = playground_changes.remove_char;
         let change_to_x = playground_changes.change_to_x;
         let chage_to_o = playground_changes.chage_to_o;
+        let add_food = playground_changes.add_food;
         //println!("recieved from channel");
         // for x in 1..width - 1 {
         //     for y in 1..height - 1 {
@@ -113,6 +115,9 @@ async fn update_playground(
         change_to_x
             .iter()
             .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'X');
+        add_food
+            .iter()
+            .for_each(|(i, f)| cloned_playground[i.0 as usize][i.1 as usize] = *f);
         // let len = pieces_pos.len();
         // for (index, &(x, y)) in pieces_pos.iter().enumerate() {
         //     if index == len - 1 {
@@ -206,11 +211,8 @@ pub async fn clinet_tasks(
             status: GameStatus::Alive,
             len: snake.len,
         };
-        if let Err(e) = snake_status_check(
-            &playground_changes.change_to_x.get(0).unwrap(),
-            playground.clone(),
-            &mut snake,
-        ) {
+        if let Err(e) = snake_status_check(playground.clone(), &mut snake, &mut playground_changes)
+        {
             host_side_data.status = GameStatus::Dead;
             socket
                 .write(serde_json::to_string(&host_side_data)?.as_bytes())
@@ -221,6 +223,7 @@ pub async fn clinet_tasks(
             playground_changes.change_to_x.clear();
             //loose(&mut playground_changes, snake);
             tx.send(playground_changes).await?;
+            println!("a user left");
             break;
         }
         socket
@@ -292,15 +295,29 @@ fn user_display_generator(
 
     // let mut data = [0_u8; 5000];
     // let mut index = 0;
+    //println!("{:?}", conversion_vector);
+
     let mut data = String::new();
-    (0..terminal_size.1).for_each(|y| {
-        (0..terminal_size.0).for_each(|x| {
-            data.push(
-                cloned_playground[(x + conversion_vector.0) as usize]
-                    [(y + conversion_vector.1) as usize],
-            );
+    (0..if terminal_size.1 > playground_len.1 as u16 {
+        playground_len.1 as u16
+    } else {
+        terminal_size.1
+    })
+        .for_each(|y| {
+            (0..if terminal_size.0 > playground_len.0 as u16 {
+                playground_len.0 as u16
+            } else {
+                terminal_size.0
+            })
+                .for_each(|x| {
+                    data.push(
+                        cloned_playground[(x + conversion_vector.0) as usize]
+                            [(y + conversion_vector.1) as usize],
+                    );
+                });
+            (0..terminal_size.0.saturating_sub(playground_len.0 as u16))
+                .for_each(|_| data.push(' ')); //without this if the termial size is larger than playground size then it displays chaotic in client terminal
         });
-    });
     // [..terminal_size.1].iter().for_each(|y| [..terminal_size.0].fore);
     //*playground.write().unwrap() = cloned_playground;
     //println!("{:?}", pieces_pos.last().unwrap());
@@ -314,10 +331,11 @@ fn generate_head_location(playground_size: (usize, usize)) -> (usize, usize) {
     )
 }
 fn snake_status_check(
-    head: &(u16, u16),
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
     snake: &mut SnakeBody,
+    playground_changes: &mut PlaygroundChanges,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
+    let head = playground_changes.change_to_x.get(0).unwrap();
     let character = playground.read().unwrap()[head.0 as usize][head.1 as usize];
     if character == '#' || character == 'O' || character == 'X' {
         Err("loose")?;
@@ -325,8 +343,9 @@ fn snake_status_check(
     if let Some(n) = character.to_digit(10) {
         (0..n).for_each(|_| snake.eat_food());
         let mut cloned_playground = { (*playground.read().unwrap()).clone() };
-        add_food(&mut cloned_playground);
-        *playground.write().unwrap() = cloned_playground;
+        playground_changes.add_food = add_food(&mut cloned_playground);
+        //playground_changes.*playground.write().unwrap() = cloned_playground;
+        //println!("added");
     }
 
     Ok(())
@@ -345,14 +364,16 @@ fn start(playground: Arc<RwLock<Box<[Box<[char]>]>>>) {
         cloned_playground[0][y] = '#';
         cloned_playground[len.0 - 1][y] = '#';
     }
-    (0..(len.0 * len.1 / 100)).for_each(|_| add_food(&mut cloned_playground));
+    (0..(len.0 * len.1 / 100)).for_each(|_| {
+        add_food(&mut cloned_playground);
+    });
     *playground.write().unwrap() = cloned_playground;
 }
 // fn loose(playground_changes: &mut PlaygroundChanges, snake: SnakeBody) {
 //     playground_changes.remove_char = snake.pieces;
 // }
 
-fn add_food(playground: &mut Box<[Box<[char]>]>) {
+fn add_food(playground: &mut Box<[Box<[char]>]>) -> Vec<((u16, u16), char)> {
     const FOODS: [u8; 15] = [1, 1, 1, 1, 2, 2, 3, 3, 5, 5, 5, 7, 8, 8, 9];
     let mut x = 0;
     let mut y = 0;
@@ -364,5 +385,7 @@ fn add_food(playground: &mut Box<[Box<[char]>]>) {
     }
     let mut rng = rng();
     let &food = FOODS.choose(&mut rng).unwrap();
-    playground[x][y] = std::char::from_digit(food as u32, 10).unwrap();
+    let food = std::char::from_digit(food as u32, 10).unwrap();
+    playground[x][y] = food;
+    vec![((x as u16, y as u16), food)]
 }

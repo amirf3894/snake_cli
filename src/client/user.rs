@@ -45,7 +45,6 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
     // let command = Arc::new(RwLock::new(CommandKeys::None));
     tokio::spawn(read_key_to_command(tx));
-    let mut duration = 200;
     let mut host_side_data = HostSideData {
         display_data: "".to_string(),
         status: GameStatus::Alive,

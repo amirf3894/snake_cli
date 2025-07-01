@@ -155,7 +155,7 @@ pub async fn clinet_tasks(
     };
 
     loop {
-        let wait_handler = tokio::spawn(sleep(Duration::from_millis(200)));
+        //let wait_handler = tokio::spawn(sleep(Duration::from_millis(1200)));
         // let mut snake = SnakeBody{
         //     len : 2,
         //     pieces: vec![()]
@@ -166,6 +166,7 @@ pub async fn clinet_tasks(
         let recieved_data =
             serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]))?;
 
+        // sleep(Duration::from_secs(1)).await;
         let command = recieved_data.command;
         //println!("{:?}", command);
         let terminal_size = recieved_data.terminal_size;
@@ -175,11 +176,6 @@ pub async fn clinet_tasks(
         }
 
         let (_, snake_changes) = snake.move_forward();
-        if let Err(e) = snake_status_check(&snake_changes.new_head, playground.clone(), &mut snake)
-        {
-            println!("{}", e.to_string());
-            break;
-        }
         let display_data = user_display_generator(
             playground.clone(),
             &snake_changes.new_head,
@@ -187,17 +183,22 @@ pub async fn clinet_tasks(
             &terminal_size,
         )?;
         //tx.send(pieces_pos).await?;
-        let async_tx = tx.clone();
-        let mpsc_handler = tokio::spawn(async move { async_tx.send(snake_changes).await });
         let data_send = serde_json::to_string(&HostSideData {
             display_data,
             status: "nothing".to_string(),
         })?;
         socket.write(data_send.as_bytes()).await?;
+        if let Err(e) = snake_status_check(&snake_changes.new_head, playground.clone(), &mut snake)
+        {
+            println!("{}", e.to_string());
+            break;
+        }
 
+        let async_tx = tx.clone();
+        let mpsc_handler = tokio::spawn(async move { async_tx.send(snake_changes).await });
         //let async_tx = tx.clone();
         //let user_screen = println!("{}", String::from_utf8_lossy(&buf[..len]));
-        let _ = join!(wait_handler, mpsc_handler);
+        let _ = join!(mpsc_handler);
     }
 
     Ok(())

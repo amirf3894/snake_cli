@@ -16,6 +16,8 @@ use crossterm::{
 use std::{
     io::{Write, stdout},
     sync::{Arc, RwLock, mpsc::Sender},
+    thread::sleep,
+    time::Duration,
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, Interest},
@@ -37,6 +39,7 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     // let command = Arc::new(RwLock::new(CommandKeys::None));
     tokio::spawn(read_key_to_command(tx));
     loop {
+        sleep(Duration::from_millis(200));
         let command = rx.try_recv().unwrap_or(CommandKeys::None);
         //print!("{:?}", command);
         //let terminal_size = size()?;

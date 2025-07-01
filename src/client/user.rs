@@ -108,28 +108,32 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
 async fn read_key_to_command(tx: Sender<CommandKeys>) {
     loop {
         let key_event = read().unwrap();
-        let new_command = match key_event.as_key_press_event().unwrap().code {
-            KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                CommandKeys::Directions(Direction::Up)
+        let new_command = if let Some(key) = key_event.as_key_press_event() {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+                    CommandKeys::Directions(Direction::Up)
+                }
+                KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
+                    CommandKeys::Directions(Direction::Down)
+                }
+                KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('D') => {
+                    CommandKeys::Directions(Direction::Right)
+                }
+                KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
+                    CommandKeys::Directions(Direction::Left)
+                }
+                KeyCode::Char(' ') => CommandKeys::ChangeSpeed,
+                KeyCode::Esc => CommandKeys::End,
+                _ => continue,
             }
-            KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
-                CommandKeys::Directions(Direction::Down)
-            }
-            KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('D') => {
-                CommandKeys::Directions(Direction::Right)
-            }
-            KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
-                CommandKeys::Directions(Direction::Left)
-            }
-            KeyCode::Char(' ') => CommandKeys::ChangeSpeed,
-            KeyCode::Esc => CommandKeys::End,
-            _ => continue,
-        };
-        tx.send(new_command).unwrap();
+        }
         // println!("pressed");
         //stdout().flush().unwrap();
+        else {
+            continue;
+        };
+        tx.send(new_command).unwrap();
     }
-
     // print!("command");
     // return;
 }

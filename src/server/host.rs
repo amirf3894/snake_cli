@@ -215,7 +215,7 @@ pub async fn clinet_tasks(
             socket
                 .write(serde_json::to_string(&host_side_data)?.as_bytes())
                 .await?;
-            playground_changes.remove_char = snake.pieces;
+            playground_changes.remove_char.append(&mut snake.pieces);
             playground_changes.remove_char.pop(); //without this line a place where head imapcted would cleared 
             playground_changes.chage_to_o.clear();
             playground_changes.change_to_x.clear();

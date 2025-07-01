@@ -75,21 +75,11 @@ impl SnakeBody {
     }
     pub fn eat_food(&mut self) {
         //let &head = self.pieces.last().unwrap();
-        let tail0 = self.pieces.get(0).unwrap();
-        let tail1 = self.pieces.get(1).unwrap();
-        let move_vector = (
-            (tail0.0 as i16 - tail1.0 as i16),
-            (tail0.1 as i16 - tail1.1 as i16),
-        );
+        let tail = self.pieces.get(0).unwrap();
+
         //let move_vector = self.pieces.get(0).unwrap() - self.pieces.get(1).unwrap();
 
-        self.pieces.insert(
-            0,
-            (
-                (move_vector.0 + tail0.0 as i16) as u16,
-                (move_vector.1 + tail0.1 as i16) as u16,
-            ),
-        );
+        self.pieces.insert(0, (tail.0, tail.1));
         self.len += 1;
     }
 }

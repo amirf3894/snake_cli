@@ -26,7 +26,7 @@ pub enum CommandKeys {
     Invalid,
     Exit,
     End,
-    Faster,
+    ChangeSpeed,
     None,
 }
 impl CommandKeys {

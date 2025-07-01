@@ -3,7 +3,7 @@ use crate::{
         self, init,
         model::{CommandKeys, Direction},
     },
-    server::host::{ClientSendData, HostSideData},
+    server::host::{ClientSendData, GameStatus, HostSideData},
 };
 use clap::builder::Str;
 use crossterm::{
@@ -24,6 +24,11 @@ use tokio::{
     net::TcpStream,
 };
 pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::error::Error)>> {
+    const FASTER_DURATION: u64 = 50;
+
+    const SLOWER_DURATION: u64 = 200;
+    let mut loose_weight = false;
+    let mut duration = SLOWER_DURATION;
     let mut buff = [0_u8; 10_000];
     let mut stream = TcpStream::connect(addr).await?;
     // let data = serde_json::to_string(&ClientSendData {
@@ -38,9 +43,32 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
     // let command = Arc::new(RwLock::new(CommandKeys::None));
     tokio::spawn(read_key_to_command(tx));
+    let mut duration = 200;
+    let mut host_side_data = HostSideData {
+        display_data: "".to_string(),
+        status: GameStatus::Alive,
+        len: 2,
+    };
+    let mut client_side_data;
     loop {
-        sleep(Duration::from_millis(200));
-        let command = rx.try_recv().unwrap_or(CommandKeys::None);
+        sleep(Duration::from_millis(duration));
+        let mut command = rx.try_recv().unwrap_or(CommandKeys::None);
+        if let CommandKeys::ChangeSpeed = command {
+            command = CommandKeys::None;
+            if duration == FASTER_DURATION {
+                duration = SLOWER_DURATION;
+                loose_weight = false;
+            } else {
+                duration = FASTER_DURATION;
+                loose_weight = true;
+            }
+        }
+        if duration == FASTER_DURATION {
+            if host_side_data.len < 3 {
+                duration = SLOWER_DURATION;
+            }
+            loose_weight = !loose_weight;
+        }
         //print!("{:?}", command);
         //let terminal_size = size()?;
 
@@ -49,16 +77,20 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
         //     (*gurad).clone()
         // };
         // *command.write().unwrap() = CommandKeys::None;
-        let data = serde_json::to_string(&ClientSendData {
+        client_side_data = ClientSendData {
             terminal_size: size()?,
             command,
-        })?;
-        stream.write(data.as_bytes()).await?;
+            loose_weight,
+        };
+        stream
+            .write(serde_json::to_string(&client_side_data)?.as_bytes())
+            .await?;
         let len = stream.read(&mut buff).await?;
-        let data = serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))?;
+        host_side_data =
+            serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))?;
 
         execute!(stdout, MoveTo(0, 0),)?;
-        write!(stdout, "{}", data.display_data)?;
+        write!(stdout, "{}", host_side_data.display_data)?;
 
         stdout.flush()?;
     }
@@ -80,7 +112,7 @@ async fn read_key_to_command(tx: Sender<CommandKeys>) {
             KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
                 CommandKeys::Directions(Direction::Left)
             }
-            KeyCode::Char(' ') => CommandKeys::Faster,
+            KeyCode::Char(' ') => CommandKeys::ChangeSpeed,
             KeyCode::Esc => CommandKeys::End,
             _ => continue,
         };

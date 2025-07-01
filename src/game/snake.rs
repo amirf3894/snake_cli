@@ -63,7 +63,7 @@ pub async fn main_snake() -> Result<(), Box<dyn (std::error::Error)>> {
             &pieces_pos,
             &mut conversion_vectore,
         )?;
-        if let CommandKeys::Faster = *command.read().unwrap() {
+        if let CommandKeys::ChangeSpeed = *command.read().unwrap() {
             if duration == FASTER_DURATION {
                 duration = DEFUALT_DURATION;
                 snake_loose_weight = false;
@@ -200,7 +200,7 @@ async fn read_key_to_command(command: Arc<RwLock<CommandKeys>>) {
             event::KeyCode::Left | event::KeyCode::Char('a') | event::KeyCode::Char('A') => {
                 CommandKeys::Directions(Direction::Left)
             }
-            event::KeyCode::Char(' ') => CommandKeys::Faster,
+            event::KeyCode::Char(' ') => CommandKeys::ChangeSpeed,
             event::KeyCode::Esc => CommandKeys::End,
             _ => continue,
         };

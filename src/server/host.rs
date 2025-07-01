@@ -30,11 +30,18 @@ pub struct PlaygroundChanges {
 pub struct ClientSendData {
     pub terminal_size: (u16, u16),
     pub command: CommandKeys,
+    pub loose_weight: bool,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HostSideData {
     pub display_data: String,
-    pub status: String,
+    pub status: GameStatus,
+    pub len: usize,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub enum GameStatus {
+    Dead,
+    Alive,
 }
 pub async fn main_host(
     playground_size: (u16, u16),
@@ -48,7 +55,7 @@ pub async fn main_host(
     start(playground.clone());
     let listener = TcpListener::bind(addr).await?;
     let async_playground = playground.clone(); //let async_playground = playground.clone();
-    let check_new_user_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         loop {
             //println!("inside loop");
             let thread_playground = async_playground.clone();
@@ -83,10 +90,10 @@ async fn update_playground(
     //let mut playground = playground.write().unwrap();
     //let (width, height) = (playground_size.0 as usize, playground_size.1 as usize);
     loop {
-        let snake_changes = rx.recv().await.unwrap();
-        let remove_char = snake_changes.remove_char;
-        let change_to_x = snake_changes.change_to_x;
-        let chage_to_o = snake_changes.chage_to_o;
+        let playground_changes = rx.recv().await.unwrap();
+        let remove_char = playground_changes.remove_char;
+        let change_to_x = playground_changes.change_to_x;
+        let chage_to_o = playground_changes.chage_to_o;
         //println!("recieved from channel");
         // for x in 1..width - 1 {
         //     for y in 1..height - 1 {
@@ -180,22 +187,26 @@ pub async fn clinet_tasks(
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
-
-        let (_, snake_changes) = snake.move_forward();
+        let (_, mut playground_changes) = snake.move_forward();
+        if recieved_data.loose_weight {
+            playground_changes.remove_char.push(snake.pieces.remove(0));
+            snake.len -= 1;
+        }
         let display_data = user_display_generator(
             playground.clone(),
-            &snake_changes.change_to_x.get(0).unwrap(),
+            &playground_changes.change_to_x.get(0).unwrap(),
             &mut conversion_vector,
             &terminal_size,
         )?;
         //tx.send(pieces_pos).await?;
         let data_send = serde_json::to_string(&HostSideData {
             display_data,
-            status: "nothing".to_string(),
+            status: GameStatus::Alive,
+            len: snake.len,
         })?;
         socket.write(data_send.as_bytes()).await?;
         if let Err(e) = snake_status_check(
-            &snake_changes.change_to_x.get(0).unwrap(),
+            &playground_changes.change_to_x.get(0).unwrap(),
             playground.clone(),
             &mut snake,
         ) {
@@ -204,7 +215,7 @@ pub async fn clinet_tasks(
         }
 
         let async_tx = tx.clone();
-        let mpsc_handler = tokio::spawn(async move { async_tx.send(snake_changes).await });
+        let mpsc_handler = tokio::spawn(async move { async_tx.send(playground_changes).await });
         //let async_tx = tx.clone();
         //let user_screen = println!("{}", String::from_utf8_lossy(&buf[..len]));
         let _ = join!(mpsc_handler);
@@ -321,6 +332,7 @@ fn start(playground: Arc<RwLock<Box<[Box<[char]>]>>>) {
     (0..(len.0 * len.1 / 100)).for_each(|_| add_food(&mut cloned_playground));
     *playground.write().unwrap() = cloned_playground;
 }
+
 fn add_food(playground: &mut Box<[Box<[char]>]>) {
     const FOODS: [u8; 15] = [1, 1, 1, 1, 2, 2, 3, 3, 5, 5, 5, 7, 8, 8, 9];
     let mut x = 0;

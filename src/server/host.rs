@@ -21,10 +21,10 @@ use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     time::{error::Error, sleep},
 };
-pub struct SnakeChanges {
-    pub new_head: (u16, u16),
-    pub previous_head: (u16, u16),
-    pub removed_tail: (u16, u16),
+pub struct PlaygroundChanges {
+    pub change_to_x: Vec<(u16, u16)>,
+    pub chage_to_o: Vec<(u16, u16)>,
+    pub remove_char: Vec<(u16, u16)>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ClientSendData {
@@ -40,7 +40,7 @@ pub async fn main_host(
     playground_size: (u16, u16),
     addr: &str,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
-    let (tx, rx) = mpsc::channel::<SnakeChanges>(300);
+    let (tx, rx) = mpsc::channel::<PlaygroundChanges>(300);
     let playground = Arc::new(RwLock::new(
         vec![vec![' '; playground_size.1 as usize].into_boxed_slice(); playground_size.0 as usize]
             .into_boxed_slice(),
@@ -73,7 +73,7 @@ pub async fn main_host(
 }
 async fn update_playground(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
-    mut rx: Receiver<SnakeChanges>,
+    mut rx: Receiver<PlaygroundChanges>,
     playground_size: &(u16, u16),
 ) {
     let mut cloned_playground = {
@@ -84,9 +84,9 @@ async fn update_playground(
     //let (width, height) = (playground_size.0 as usize, playground_size.1 as usize);
     loop {
         let snake_changes = rx.recv().await.unwrap();
-        let removed_tail = snake_changes.removed_tail;
-        let new_head = snake_changes.new_head;
-        let previous_head = snake_changes.previous_head;
+        let remove_char = snake_changes.remove_char;
+        let change_to_x = snake_changes.change_to_x;
+        let chage_to_o = snake_changes.chage_to_o;
         //println!("recieved from channel");
         // for x in 1..width - 1 {
         //     for y in 1..height - 1 {
@@ -96,9 +96,15 @@ async fn update_playground(
         //         cloned_playground[x][y] = ' ';
         //     }
         // }
-        cloned_playground[removed_tail.0 as usize][removed_tail.1 as usize] = ' ';
-        cloned_playground[previous_head.0 as usize][previous_head.1 as usize] = 'O';
-        cloned_playground[new_head.0 as usize][new_head.1 as usize] = 'X';
+        remove_char
+            .iter()
+            .for_each(|&i| cloned_playground[i.0 as usize][i.1 as usize] = ' ');
+        chage_to_o
+            .iter()
+            .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'O');
+        change_to_x
+            .iter()
+            .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'X');
         // let len = pieces_pos.len();
         // for (index, &(x, y)) in pieces_pos.iter().enumerate() {
         //     if index == len - 1 {
@@ -112,7 +118,7 @@ async fn update_playground(
 }
 //pub async fn wait_for_connect()
 pub async fn clinet_tasks(
-    tx: Sender<SnakeChanges>,
+    tx: Sender<PlaygroundChanges>,
     mut socket: TcpStream,
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
     playground_size: &(u16, u16),
@@ -178,7 +184,7 @@ pub async fn clinet_tasks(
         let (_, snake_changes) = snake.move_forward();
         let display_data = user_display_generator(
             playground.clone(),
-            &snake_changes.new_head,
+            &snake_changes.change_to_x.get(0).unwrap(),
             &mut conversion_vector,
             &terminal_size,
         )?;
@@ -188,8 +194,11 @@ pub async fn clinet_tasks(
             status: "nothing".to_string(),
         })?;
         socket.write(data_send.as_bytes()).await?;
-        if let Err(e) = snake_status_check(&snake_changes.new_head, playground.clone(), &mut snake)
-        {
+        if let Err(e) = snake_status_check(
+            &snake_changes.change_to_x.get(0).unwrap(),
+            playground.clone(),
+            &mut snake,
+        ) {
             println!("{}", e.to_string());
             break;
         }

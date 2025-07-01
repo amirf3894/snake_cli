@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::server::host::SnakeChanges;
+use crate::server::host::PlaygroundChanges;
 #[derive(Clone)]
 pub struct SnakeBody {
     pub len: usize,
@@ -52,7 +52,7 @@ impl SnakeBody {
         }
         self.movement_adder = new_movement_adder;
     }
-    pub fn move_forward(&mut self) -> (Vec<(u16, u16)>, SnakeChanges) {
+    pub fn move_forward(&mut self) -> (Vec<(u16, u16)>, PlaygroundChanges) {
         let &previous_head = self.pieces.get(self.len - 1).unwrap();
         let removed_tail = self.pieces.remove(0);
         let new_head = (
@@ -66,10 +66,10 @@ impl SnakeBody {
         self.pieces.push(new_head);
         (
             self.pieces.clone(),
-            SnakeChanges {
-                new_head,
-                previous_head,
-                removed_tail,
+            PlaygroundChanges {
+                change_to_x: vec![new_head],
+                chage_to_o: vec![previous_head],
+                remove_char: vec![removed_tail],
             },
         )
     }

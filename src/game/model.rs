@@ -70,7 +70,7 @@ impl SnakeBody {
             self.pieces.clone(),
             PlaygroundChanges {
                 change_to_x: vec![new_head],
-                chage_to_o: vec![previous_head],
+                change_to_o: vec![previous_head],
                 remove_char: vec![removed_tail],
                 add_food: vec![],
             },

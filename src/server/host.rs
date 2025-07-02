@@ -4,6 +4,7 @@ use crate::game::{
     snake::{self},
 };
 use clap::{self};
+use crossterm::style::Stylize;
 use rand::{rand_core::le, random_range, rng, seq::IndexedRandom};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -26,7 +27,7 @@ use tokio::{
 #[derive(Clone)]
 pub struct PlaygroundChanges {
     pub change_to_x: Vec<(u16, u16)>,
-    pub chage_to_o: Vec<(u16, u16)>,
+    pub change_to_o: Vec<(u16, u16)>,
     pub remove_char: Vec<(u16, u16)>,
     pub add_food: Vec<((u16, u16), char)>,
 }
@@ -72,7 +73,7 @@ pub async fn main_host(
                 rt.block_on(async {
                     let mut playground_changes = PlaygroundChanges {
                         change_to_x: vec![],
-                        chage_to_o: vec![],
+                        change_to_o: vec![],
                         remove_char: vec![],
                         add_food: vec![],
                     };
@@ -189,7 +190,7 @@ pub async fn clinet_tasks(
         }
         let display_data = user_display_generator(
             playground.clone(),
-            &playground_changes.change_to_x.get(0).unwrap(),
+            &playground_changes.change_to_o.get(0).unwrap(),
             &mut conversion_vector,
             &terminal_size,
         )?;
@@ -286,14 +287,37 @@ fn user_display_generator(
                 terminal_size.0
             })
                 .for_each(|x| {
-                    data.push(
-                        cloned_playground[(x + conversion_vector.0) as usize]
-                            [(y + conversion_vector.1) as usize],
-                    );
+                    let item = cloned_playground[(x + conversion_vector.0) as usize]
+                        [(y + conversion_vector.1) as usize];
+                    let colored_item = match item {
+                        'X' => {
+                            if (x + conversion_vector.0, y + conversion_vector.1) == *snake_head {
+                                Some('X'.green())
+                                //data.push('Z');
+                            } else {
+                                Some('X'.red())
+                            }
+                        }
+                        '#' => Some('#'.dark_red()),
+                        other => {
+                            if other.is_digit(10) {
+                                Some(other.cyan())
+                            } else {
+                                None
+                            }
+                        }
+                    };
+                    if let Some(colored) = colored_item {
+                        data.push_str(colored.to_string().as_str());
+                    } else {
+                        data.push(item);
+                    }
+                    // data.push_str(item.to_string().as_str());
                 });
             (0..terminal_size.0.saturating_sub(playground_len.0 as u16))
                 .for_each(|_| data.push(' ')); //without this if the termial size is larger than playground size then it displays chaotic in client terminal
         });
+
     // [..terminal_size.1].iter().for_each(|y| [..terminal_size.0].fore);
     //*playground.write().unwrap() = cloned_playground;
     //println!("{:?}", pieces_pos.last().unwrap());
@@ -378,7 +402,7 @@ pub async fn loose(
     if err.as_ref().unwrap_err().to_string() == "loose" {
         playground_changes.remove_char.pop();
     }
-    playground_changes.chage_to_o.clear();
+    playground_changes.change_to_o.clear();
     playground_changes.change_to_x.clear();
     tx.send(playground_changes).await.unwrap();
     println!("user left: ({})", err.err().unwrap().to_string());
@@ -403,7 +427,7 @@ async fn update_playground(
         let playground_changes = rx.recv().await.unwrap();
         let remove_char = playground_changes.remove_char;
         let change_to_x = playground_changes.change_to_x;
-        let chage_to_o = playground_changes.chage_to_o;
+        let change_to_o = playground_changes.change_to_o;
         let add_food = playground_changes.add_food;
         //println!("recieved from channel");
         // for x in 1..width - 1 {
@@ -417,7 +441,7 @@ async fn update_playground(
         remove_char
             .iter()
             .for_each(|&i| cloned_playground[i.0 as usize][i.1 as usize] = ' ');
-        chage_to_o
+        change_to_o
             .iter()
             .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'O');
         change_to_x

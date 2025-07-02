@@ -87,6 +87,7 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
             .write(serde_json::to_string(&client_side_data)?.as_bytes())
             .await?;
         let len = stream.read(&mut buff).await?;
+        //println!("{:#?}", String::from_utf8_lossy(&buff[..len]));
         host_side_data =
             serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))?;
 

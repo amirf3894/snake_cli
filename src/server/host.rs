@@ -8,6 +8,7 @@ use rand::{rand_core::le, random_range, rng, seq::IndexedRandom};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
+    error::Error,
     process::exit,
     sync::{Arc, RwLock},
     thread,
@@ -20,8 +21,9 @@ use tokio::{
     net::{TcpListener, TcpStream},
     runtime::Runtime,
     sync::mpsc::{self, Receiver, Sender},
-    time::{error::Error, sleep},
+    time::sleep,
 };
+#[derive(Clone)]
 pub struct PlaygroundChanges {
     pub change_to_x: Vec<(u16, u16)>,
     pub chage_to_o: Vec<(u16, u16)>,
@@ -61,16 +63,49 @@ pub async fn main_host(
         loop {
             //println!("inside loop");
             let thread_playground = async_playground.clone();
-            let (socket, _) = listener.accept().await.unwrap();
-            println!("socket detected");
+            let (mut socket, _) = listener.accept().await.unwrap();
             let thread_tx = tx.clone();
+            println!("socket detected");
             //let thread_playground = async_playground.clone();
-            thread::spawn(move || {
+            tokio::task::spawn_blocking(move || {
                 let rt = Runtime::new().unwrap();
                 rt.block_on(async {
-                    clinet_tasks(thread_tx, socket, thread_playground, &playground_size).await
-                })
-                .unwrap();
+                    let mut playground_changes = PlaygroundChanges {
+                        change_to_x: vec![],
+                        chage_to_o: vec![],
+                        remove_char: vec![],
+                        add_food: vec![],
+                    };
+                    let mut host_side_data = HostSideData {
+                        display_data: "".to_string(),
+                        status: GameStatus::Alive,
+                        len: 2,
+                    };
+                    let mut snake = SnakeBody {
+                        len: 2,
+                        pieces: vec![],
+                        movement_adder: (-1, 0),
+                    };
+                    let err = clinet_tasks(
+                        &mut snake,
+                        &mut host_side_data,
+                        &mut playground_changes,
+                        thread_tx.clone(),
+                        &mut socket,
+                        thread_playground,
+                        &playground_size,
+                    )
+                    .await;
+                    loose(
+                        host_side_data,
+                        &mut snake,
+                        socket,
+                        playground_changes,
+                        thread_tx,
+                        err,
+                    )
+                    .await;
+                });
             });
 
             //a.join();
@@ -80,59 +115,13 @@ pub async fn main_host(
     update_playground(playground, rx, &playground_size).await;
     Ok(())
 }
-async fn update_playground(
-    playground: Arc<RwLock<Box<[Box<[char]>]>>>,
-    mut rx: Receiver<PlaygroundChanges>,
-    playground_size: &(u16, u16),
-) {
-    let mut cloned_playground = {
-        let guard = playground.read().unwrap();
-        (*guard).clone()
-    };
-    //let mut playground = playground.write().unwrap();
-    //let (width, height) = (playground_size.0 as usize, playground_size.1 as usize);
-    loop {
-        let playground_changes = rx.recv().await.unwrap();
-        let remove_char = playground_changes.remove_char;
-        let change_to_x = playground_changes.change_to_x;
-        let chage_to_o = playground_changes.chage_to_o;
-        let add_food = playground_changes.add_food;
-        //println!("recieved from channel");
-        // for x in 1..width - 1 {
-        //     for y in 1..height - 1 {
-        //         if cloned_playground[x][y].is_digit(10) {
-        //             continue;
-        //         }
-        //         cloned_playground[x][y] = ' ';
-        //     }
-        // }
-        remove_char
-            .iter()
-            .for_each(|&i| cloned_playground[i.0 as usize][i.1 as usize] = ' ');
-        chage_to_o
-            .iter()
-            .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'O');
-        change_to_x
-            .iter()
-            .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'X');
-        add_food
-            .iter()
-            .for_each(|(i, f)| cloned_playground[i.0 as usize][i.1 as usize] = *f);
-        // let len = pieces_pos.len();
-        // for (index, &(x, y)) in pieces_pos.iter().enumerate() {
-        //     if index == len - 1 {
-        //         cloned_playground[x as usize][y as usize] = 'X';
-        //         continue;
-        //     }
-        //     cloned_playground[x as usize][y as usize] = 'O';
-        // }
-        *playground.write().unwrap() = cloned_playground.clone();
-    }
-}
 //pub async fn wait_for_connect()
 pub async fn clinet_tasks(
+    snake: &mut SnakeBody,
+    host_side_data: &mut HostSideData,
+    playground_changes: &mut PlaygroundChanges,
     tx: Sender<PlaygroundChanges>,
-    mut socket: TcpStream,
+    socket: &mut TcpStream,
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
     playground_size: &(u16, u16),
 ) -> Result<(), Box<dyn (std::error::Error)>> {
@@ -164,7 +153,7 @@ pub async fn clinet_tasks(
     }
     //let terminal_size = command.terminal_size;
 
-    let mut snake = SnakeBody {
+    *snake = SnakeBody {
         len: 2,
         pieces: vec![
             (tail_pos.0 as u16, tail_pos.1 as u16),
@@ -172,7 +161,6 @@ pub async fn clinet_tasks(
         ],
         movement_adder,
     };
-    let mut host_side_data;
     let mut client_side_data;
     loop {
         //let wait_handler = tokio::spawn(sleep(Duration::from_millis(1200)));
@@ -194,7 +182,7 @@ pub async fn clinet_tasks(
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
-        let (_, mut playground_changes) = snake.move_forward();
+        *playground_changes = snake.move_forward().1;
         if client_side_data.loose_weight {
             playground_changes.remove_char.push(snake.pieces.remove(0));
             snake.len -= 1;
@@ -206,38 +194,26 @@ pub async fn clinet_tasks(
             &terminal_size,
         )?;
         //tx.send(pieces_pos).await?;
-        host_side_data = HostSideData {
+        *host_side_data = HostSideData {
             display_data,
             status: GameStatus::Alive,
             len: snake.len,
         };
-        if let Err(e) = snake_status_check(playground.clone(), &mut snake, &mut playground_changes)
-        {
-            host_side_data.status = GameStatus::Dead;
-            socket
-                .write(serde_json::to_string(&host_side_data)?.as_bytes())
-                .await?;
-            playground_changes.remove_char.append(&mut snake.pieces);
-            playground_changes.remove_char.pop(); //without this line a place where head imapcted would cleared 
-            playground_changes.chage_to_o.clear();
-            playground_changes.change_to_x.clear();
-            //loose(&mut playground_changes, snake);
-            tx.send(playground_changes).await?;
-            println!("a user left");
-            break;
-        }
+        //println!("hooooy");
+        // println!("{:#?}", host_side_data);
+        snake_status_check(playground.clone(), snake, playground_changes)?;
         socket
             .write(serde_json::to_string(&host_side_data)?.as_bytes())
             .await?;
 
         let async_tx = tx.clone();
-        let mpsc_handler = tokio::spawn(async move { async_tx.send(playground_changes).await });
+        let cloned_playground_changes = playground_changes.clone();
+        let mpsc_handler =
+            tokio::spawn(async move { async_tx.send(cloned_playground_changes).await });
         //let async_tx = tx.clone();
         //let user_screen = println!("{}", String::from_utf8_lossy(&buf[..len]));
         let _ = join!(mpsc_handler);
     }
-
-    Ok(())
 }
 fn user_display_generator(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
@@ -388,4 +364,76 @@ fn add_food(playground: &mut Box<[Box<[char]>]>) -> Vec<((u16, u16), char)> {
     let food = std::char::from_digit(food as u32, 10).unwrap();
     playground[x][y] = food;
     vec![((x as u16, y as u16), food)]
+}
+pub async fn loose(
+    mut host_side_data: HostSideData,
+    snake: &mut SnakeBody,
+    mut socket: TcpStream,
+    mut playground_changes: PlaygroundChanges,
+    tx: Sender<PlaygroundChanges>,
+    err: Result<(), Box<dyn (std::error::Error)>>,
+) {
+    host_side_data.status = GameStatus::Dead;
+    playground_changes.remove_char.append(&mut snake.pieces);
+    if err.as_ref().unwrap_err().to_string() == "loose" {
+        playground_changes.remove_char.pop();
+    }
+    playground_changes.chage_to_o.clear();
+    playground_changes.change_to_x.clear();
+    tx.send(playground_changes).await.unwrap();
+    println!("user left: ({})", err.err().unwrap().to_string());
+    socket
+        .write(serde_json::to_string(&host_side_data).unwrap().as_bytes())
+        .await
+        .unwrap();
+}
+
+async fn update_playground(
+    playground: Arc<RwLock<Box<[Box<[char]>]>>>,
+    mut rx: Receiver<PlaygroundChanges>,
+    playground_size: &(u16, u16),
+) {
+    let mut cloned_playground = {
+        let guard = playground.read().unwrap();
+        (*guard).clone()
+    };
+    //let mut playground = playground.write().unwrap();
+    //let (width, height) = (playground_size.0 as usize, playground_size.1 as usize);
+    loop {
+        let playground_changes = rx.recv().await.unwrap();
+        let remove_char = playground_changes.remove_char;
+        let change_to_x = playground_changes.change_to_x;
+        let chage_to_o = playground_changes.chage_to_o;
+        let add_food = playground_changes.add_food;
+        //println!("recieved from channel");
+        // for x in 1..width - 1 {
+        //     for y in 1..height - 1 {
+        //         if cloned_playground[x][y].is_digit(10) {
+        //             continue;
+        //         }
+        //         cloned_playground[x][y] = ' ';
+        //     }
+        // }
+        remove_char
+            .iter()
+            .for_each(|&i| cloned_playground[i.0 as usize][i.1 as usize] = ' ');
+        chage_to_o
+            .iter()
+            .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'O');
+        change_to_x
+            .iter()
+            .for_each(|i| cloned_playground[i.0 as usize][i.1 as usize] = 'X');
+        add_food
+            .iter()
+            .for_each(|(i, f)| cloned_playground[i.0 as usize][i.1 as usize] = *f);
+        // let len = pieces_pos.len();
+        // for (index, &(x, y)) in pieces_pos.iter().enumerate() {
+        //     if index == len - 1 {
+        //         cloned_playground[x as usize][y as usize] = 'X';
+        //         continue;
+        //     }
+        //     cloned_playground[x as usize][y as usize] = 'O';
+        // }
+        *playground.write().unwrap() = cloned_playground.clone();
+    }
 }

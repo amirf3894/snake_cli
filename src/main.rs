@@ -5,6 +5,7 @@ use crossterm::{
     cursor, execute,
     terminal::{LeaveAlternateScreen, disable_raw_mode},
 };
+use game::init::end;
 //use snake::game::snake;
 use snakecli::{self, client::user::main_client, game, server::host::main_host};
 #[tokio::main]
@@ -87,9 +88,10 @@ async fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
 async fn client(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
     let addr = arg.get_one::<String>("ip").unwrap();
     let name = arg.get_one::<String>("name").unwrap();
-    main_client(name, addr).await?;
+    let err = main_client(name, addr).await;
 
-    Ok(())
+    end(&err.unwrap_err().to_string(), &mut stdout())?;
+    exit(0);
 }
 async fn solo() -> Result<(), Box<dyn (std::error::Error)>> {
     game::snake::main_snake().await?;

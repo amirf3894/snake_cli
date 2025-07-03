@@ -32,7 +32,11 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     let mut loose_weight = false;
     let mut duration = SLOWER_DURATION;
     let mut buff = [0_u8; 20_000];
-    let mut stream = TcpStream::connect(addr).await?;
+    let mut stdout = stdout();
+    execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
+    let mut stream = TcpStream::connect(addr)
+        .await
+        .map_err(|_| "COULDN'T CONNECT TO SERVER!")?;
     // let data = serde_json::to_string(&ClientSendData {
     //     terminal_size: size().unwrap(),
     //     command: CommandKeys::None,
@@ -41,8 +45,6 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     // let _ = stream.read_u8().await;
     let (tx, rx) = std::sync::mpsc::channel::<CommandKeys>();
     enable_raw_mode()?;
-    let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
     // let command = Arc::new(RwLock::new(CommandKeys::None));
     tokio::spawn(read_key_to_command(tx));
     let mut host_side_data = HostSideData {
@@ -86,16 +88,15 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
         stream
             .write(serde_json::to_string(&client_side_data)?.as_bytes())
             .await
-            .inspect_err(|_| end("CAN'T WRITE TO SERVER!", &mut stdout).unwrap())
-            .unwrap();
+            .map_err(|_| "COULDN'T WRITE TO SERVER!")?;
         let len = stream
             .read(&mut buff)
             .await
-            .inspect_err(|_| end("CAN'T READ FROM SERVER!", &mut stdout).unwrap())
-            .unwrap();
+            .map_err(|_| "COULDN't READ FROM SERVER!")?;
         //println!("{:#?}", String::from_utf8_lossy(&buff[..len]));
         host_side_data =
-            serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))?;
+            serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))
+                .map_err(|_| "COULDN't READ FROM SERVER!")?;
 
         execute!(stdout, MoveTo(0, 0),)?;
         write!(stdout, "{}", host_side_data.display_data)?;
@@ -104,9 +105,7 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
         if let GameStatus::Dead(msg) = host_side_data.status {
             // execute!(stdout, MoveTo((size()?.0 - 9) / 2, (size()?.1) / 2))?;
             // println!("you loose");
-            end(&msg, &mut stdout)?;
-
-            exit(0);
+            Err(msg)?;
         }
     }
     //TcpStream

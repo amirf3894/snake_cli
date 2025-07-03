@@ -47,7 +47,8 @@ pub fn end(text: &str, stdout: &mut Stdout) -> io::Result<()> {
     read()?;
     execute!(stdout, LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    exit(0);
+    //exit(0);
+    Ok(())
 }
 
 pub fn print_wall(stdout: &mut Stdout) -> io::Result<()> {

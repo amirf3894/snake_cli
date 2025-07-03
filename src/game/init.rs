@@ -7,7 +7,10 @@ use crossterm::{
     },
 };
 
-use std::io::{self, Stdout, Write, stdout};
+use std::{
+    io::{self, Stdout, Write, stdout},
+    process::exit,
+};
 
 use crate::game::snake::add_food;
 
@@ -44,7 +47,7 @@ pub fn end(text: &str, stdout: &mut Stdout) -> io::Result<()> {
     read()?;
     execute!(stdout, LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    Ok(())
+    exit(0);
 }
 
 pub fn print_wall(stdout: &mut Stdout) -> io::Result<()> {

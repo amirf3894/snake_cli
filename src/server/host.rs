@@ -45,7 +45,7 @@ pub struct HostSideData {
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub enum GameStatus {
-    Dead,
+    Dead(String),
     Alive,
 }
 pub async fn main_host(
@@ -183,6 +183,10 @@ pub async fn clinet_tasks(
         if let CommandKeys::Directions(direction) = command {
             snake.change_direction(&direction);
         }
+        if let CommandKeys::End = command {
+            host_side_data.status = GameStatus::Dead("YOU LEFT, HOPE YOU ENJOY THIS".to_string());
+            Err("user pressed escape")?;
+        }
         *playground_changes = snake.move_forward().1;
         if client_side_data.loose_weight {
             playground_changes.remove_char.push(snake.pieces.remove(0));
@@ -202,7 +206,12 @@ pub async fn clinet_tasks(
         };
         //println!("hooooy");
         // println!("{:#?}", host_side_data);
-        snake_status_check(playground.clone(), snake, playground_changes)?;
+        snake_status_check(
+            host_side_data,
+            playground.clone(),
+            snake,
+            playground_changes,
+        )?;
         socket
             .write(serde_json::to_string(&host_side_data)?.as_bytes())
             .await?;
@@ -331,6 +340,7 @@ fn generate_head_location(playground_size: (usize, usize)) -> (usize, usize) {
     )
 }
 fn snake_status_check(
+    host_side_data: &mut HostSideData,
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
     snake: &mut SnakeBody,
     playground_changes: &mut PlaygroundChanges,
@@ -338,6 +348,7 @@ fn snake_status_check(
     let head = playground_changes.change_to_x.get(0).unwrap();
     let character = playground.read().unwrap()[head.0 as usize][head.1 as usize];
     if character == '#' || character == 'O' || character == 'X' {
+        host_side_data.status = GameStatus::Dead("YOU LOST :(".to_string());
         Err("loose")?;
     }
     if let Some(n) = character.to_digit(10) {
@@ -390,14 +401,14 @@ fn add_food(playground: &mut Box<[Box<[char]>]>) -> Vec<((u16, u16), char)> {
     vec![((x as u16, y as u16), food)]
 }
 pub async fn loose(
-    mut host_side_data: HostSideData,
+    host_side_data: HostSideData,
     snake: &mut SnakeBody,
     mut socket: TcpStream,
     mut playground_changes: PlaygroundChanges,
     tx: Sender<PlaygroundChanges>,
     err: Result<(), Box<dyn (std::error::Error)>>,
 ) {
-    host_side_data.status = GameStatus::Dead;
+    // host_side_data.status = GameStatus::Dead("YOU LOOSE".to_string());
     playground_changes.remove_char.append(&mut snake.pieces);
     if err.as_ref().unwrap_err().to_string() == "loose" {
         playground_changes.remove_char.pop();

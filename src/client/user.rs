@@ -85,8 +85,14 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
         };
         stream
             .write(serde_json::to_string(&client_side_data)?.as_bytes())
-            .await?;
-        let len = stream.read(&mut buff).await?;
+            .await
+            .inspect_err(|_| end("CAN'T WRITE TO SERVER!", &mut stdout).unwrap())
+            .unwrap();
+        let len = stream
+            .read(&mut buff)
+            .await
+            .inspect_err(|_| end("CAN'T READ FROM SERVER!", &mut stdout).unwrap())
+            .unwrap();
         //println!("{:#?}", String::from_utf8_lossy(&buff[..len]));
         host_side_data =
             serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))?;
@@ -95,10 +101,10 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
         write!(stdout, "{}", host_side_data.display_data)?;
 
         stdout.flush()?;
-        if let GameStatus::Dead = host_side_data.status {
+        if let GameStatus::Dead(msg) = host_side_data.status {
             // execute!(stdout, MoveTo((size()?.0 - 9) / 2, (size()?.1) / 2))?;
             // println!("you loose");
-            end("you loose", &mut stdout)?;
+            end(&msg, &mut stdout)?;
 
             exit(0);
         }

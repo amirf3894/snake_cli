@@ -292,10 +292,10 @@ fn user_display_generator(
                     let colored_item = match item {
                         'X' => {
                             if (x + conversion_vector.0, y + conversion_vector.1) == *snake_head {
-                                Some('X'.green())
+                                Some('X'.dark_green())
                                 //data.push('Z');
                             } else {
-                                Some('X'.red())
+                                Some('X'.magenta())
                             }
                         }
                         '#' => Some('#'.dark_red()),

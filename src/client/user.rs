@@ -10,7 +10,7 @@ use clap::builder::Str;
 use crossterm::{
     self,
     cursor::{self, MoveTo},
-    event::{KeyCode, read},
+    event::{KeyCode, KeyEvent, read},
     execute,
     terminal::{Clear, ClearType, EnterAlternateScreen, enable_raw_mode, size},
 };
@@ -31,7 +31,7 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     const SLOWER_DURATION: u64 = 200;
     let mut loose_weight = false;
     let mut duration = SLOWER_DURATION;
-    let mut buff = [0_u8; 10_000];
+    let mut buff = [0_u8; 20_000];
     let mut stream = TcpStream::connect(addr).await?;
     // let data = serde_json::to_string(&ClientSendData {
     //     terminal_size: size().unwrap(),
@@ -106,6 +106,7 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     //TcpStream
 }
 async fn read_key_to_command(tx: Sender<CommandKeys>) {
+    let mut previous_command = CommandKeys::None;
     loop {
         let key_event = read().unwrap();
         let new_command = if let Some(key) = key_event.as_key_press_event() {
@@ -132,6 +133,14 @@ async fn read_key_to_command(tx: Sender<CommandKeys>) {
         else {
             continue;
         };
+
+        if let CommandKeys::Directions(_) = new_command {
+            if new_command == previous_command {
+                continue;
+            }
+        }
+        previous_command = new_command.clone();
+
         tx.send(new_command).unwrap();
     }
     // print!("command");

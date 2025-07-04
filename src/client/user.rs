@@ -138,7 +138,6 @@ pub fn end(text: &str, stdout: &mut Stdout) -> io::Result<()> {
     let size = size()?;
     let max_width = text.split('\n').max_by_key(|p| p.len()).unwrap().len() + 4;
     let max_height = text.split('\n').count() + 2;
-    let mut showing_text = "*".repeat(max_width + 4);
     execute!(
         stdout,
         MoveTo(

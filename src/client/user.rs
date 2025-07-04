@@ -31,7 +31,7 @@ pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>>
     const SLOWER_DURATION: u64 = 200;
     let mut loose_weight = false;
     let mut duration = SLOWER_DURATION;
-    let mut buff = [0_u8; 45_000];
+    let mut buff;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
     let mut stream = TcpStream::connect(addr)
@@ -48,7 +48,8 @@ pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>>
     };
     let mut client_side_data;
     loop {
-        sleep(Duration::from_millis(duration));
+        buff = [0_u8; 20_000];
+        sleep(Duration::from_millis(duration - 30)); //i will explain it later
         let mut command = rx.try_recv().unwrap_or(CommandKeys::None);
         if let CommandKeys::ChangeSpeed = command {
             command = CommandKeys::None;
@@ -75,6 +76,7 @@ pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>>
             .write(serde_json::to_string(&client_side_data)?.as_bytes())
             .await
             .map_err(|_| "COULDN'T WRITE TO SERVER!")?;
+        sleep(Duration::from_millis(30)); //for slow networks it waits for server to send data
         let len = stream
             .read(&mut buff)
             .await

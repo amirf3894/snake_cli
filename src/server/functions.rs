@@ -220,14 +220,7 @@ pub fn user_display_generator(
                         Some('X'.magenta())
                     }
                 }
-                '#' => Some('#'.dark_red()),
-                other => {
-                    if other.is_digit(10) {
-                        Some(other.cyan())
-                    } else {
-                        None
-                    }
-                }
+                _ => None,
             };
             if let Some(colored) = colored_item {
                 data.push_str(colored.to_string().as_str());

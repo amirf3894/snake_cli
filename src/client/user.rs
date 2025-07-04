@@ -49,7 +49,7 @@ pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>>
     let mut client_side_data;
     loop {
         buff = [0_u8; 20_000];
-        sleep(Duration::from_millis(duration - 30)); //i will explain it later
+        sleep(Duration::from_millis(duration - 40)); //i will explain it later
         let mut command = rx.try_recv().unwrap_or(CommandKeys::None);
         if let CommandKeys::ChangeSpeed = command {
             command = CommandKeys::None;
@@ -76,7 +76,7 @@ pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>>
             .write(serde_json::to_string(&client_side_data)?.as_bytes())
             .await
             .map_err(|_| "COULDN'T WRITE TO SERVER!")?;
-        sleep(Duration::from_millis(30)); //for slow networks it waits for server to send data
+        sleep(Duration::from_millis(40)); //for slow networks it waits for server to send data
         let len = stream
             .read(&mut buff)
             .await

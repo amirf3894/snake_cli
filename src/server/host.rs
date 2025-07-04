@@ -136,7 +136,7 @@ pub async fn clinet_tasks(
     };
     let mut client_side_data;
     loop {
-        buf = [0_u8; 15_000];
+        buf = [0_u8; 1_000];
         let len = socket.read(&mut buf).await?;
         println!("{}", String::from_utf8_lossy(&buf));
         client_side_data =

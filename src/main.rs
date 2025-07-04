@@ -8,11 +8,11 @@ async fn main() {
         .subcommand(
             Command::new("host")
                 .arg(
-                    Arg::new("ip")
-                        .short('i')
-                        .long("ip")
-                        .default_value("0.0.0.0:1100")
-                        .help("An ip that server is visible for client (default: 0.0.0.0:1100)"),
+                    Arg::new("port")
+                        .short('p')
+                        .long("port")
+                        .default_value("1100")
+                        .help("A port that server is visible for client (default: 1100)"),
                 )
                 .arg(
                     Arg::new("height")
@@ -61,12 +61,13 @@ async fn main() {
 
 use snakecli::client::user::end;
 async fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
-    let addr = arg.get_one::<String>("ip").unwrap();
+    let port = arg.get_one::<String>("port").unwrap();
     let width = arg.get_one::<String>("width").unwrap();
     let height = arg.get_one::<String>("height").unwrap();
     let width: u16 = width.trim().parse()?;
     let height: u16 = height.trim().parse()?;
-    main_host((width, height), addr).await?;
+    let port: u16 = port.trim().parse()?;
+    main_host((width, height), port).await?;
     //println!("left");
     Ok(())
 }

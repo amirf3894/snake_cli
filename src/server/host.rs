@@ -1,5 +1,6 @@
 use super::functions::*;
 use crate::model::*;
+use local_ip_address::local_ip;
 use serde_json;
 use std::sync::{Arc, RwLock};
 use tokio::{
@@ -20,7 +21,7 @@ playground is Arc<RwLock> so all clients can read and update_playground write ch
 /// to handle each client
 pub async fn main_host(
     playground_size: (u16, u16),
-    addr: &str,
+    port: u16,
 ) -> Result<(), Box<dyn (std::error::Error)>> {
     let (tx, rx) = channel::<PlaygroundChanges>(300);
     let playground = Arc::new(RwLock::new(
@@ -28,9 +29,10 @@ pub async fn main_host(
             .into_boxed_slice(),
     ));
     start(playground.clone()); //initialize the map
-
+    let addr = format!("0.0.0.0:{}", port);
+    let ip = local_ip()?.to_string();
     let listener = TcpListener::bind(addr).await?;
-    println!("server is visible in: {}", addr);
+    println!("server is visible in: {}:{}", ip, port);
     let async_playground = playground.clone();
 
     //check for new clients and run a special task to handle them
@@ -134,7 +136,7 @@ pub async fn clinet_tasks(
     };
     let mut client_side_data;
     loop {
-        buf = [0_u8; 5000];
+        buf = [0_u8; 15_000];
         let len = socket.read(&mut buf).await?;
         client_side_data =
             serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]))?;

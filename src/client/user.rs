@@ -31,7 +31,7 @@ pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>>
     const SLOWER_DURATION: u64 = 200;
     let mut loose_weight = false;
     let mut duration = SLOWER_DURATION;
-    let mut buff = [0_u8; 20_000];
+    let mut buff = [0_u8; 45_000];
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
     let mut stream = TcpStream::connect(addr)

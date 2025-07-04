@@ -134,7 +134,7 @@ pub async fn clinet_tasks(
     };
     let mut client_side_data;
     loop {
-        buf = [0_u8; 500];
+        buf = [0_u8; 5000];
         let len = socket.read(&mut buf).await?;
         client_side_data =
             serde_json::from_str::<ClientSendData>(&String::from_utf8_lossy(&buf[..len]))?;

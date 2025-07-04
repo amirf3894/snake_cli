@@ -1,7 +1,7 @@
 use clap::{Arg, ArgMatches, Command};
-use std::{io::stdout, process::exit};
 use colored::{self, Colorize};
 use snakecli::{client::user::main_client, server::host::main_host};
+use std::{io::stdout, process::exit};
 #[tokio::main]
 async fn main() {
     let matches = Command::new("snake")
@@ -11,8 +11,8 @@ async fn main() {
                     Arg::new("ip")
                         .short('i')
                         .long("ip")
-                        .default_value("127.0.0.1:8080")
-                        .help("An ip that server is visible for client (default: 127.0.0:8080)"),
+                        .default_value("0.0.0.0:1100")
+                        .help("An ip that server is visible for client (default: 0.0.0.0:1100)"),
                 )
                 .arg(
                     Arg::new("height")
@@ -35,14 +35,12 @@ async fn main() {
                 Arg::new("ip")
                     .short('i')
                     .long("ip")
-                    .default_value("127.0.0.1:8080")
-                    .help("A server ip address to connect and play with others (default: 127.0.0.1:8080"),
+                    .help("A server ip address to connect and play with others"),
             ),
         )
         .subcommand(Command::new("tutorial").about("theaches how to play and shows game options"))
         .subcommand_required(true)
         .about("A cli snake game that you can play it with others")
-        
         .get_matches();
 
     let result = match matches.subcommand() {
@@ -51,7 +49,7 @@ async fn main() {
         Some(("tutorial", _)) => {
             tutorial();
             Ok(())
-        },
+        }
         _ => exit(0),
     };
     if let Err(e) = result {
@@ -79,26 +77,43 @@ async fn client(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
 
     end(&err.unwrap_err().to_string(), &mut stdout())?;
     exit(0);
-    
 }
 
-fn tutorial(){
+fn tutorial() {
     println!("{}", "************************".bright_purple());
     println!("{}", "**Welcome to snake_cli**".bright_purple());
     println!("{}", "************************".bright_purple());
     println!("");
     println!("{}", "***To play the game***".bold().yellow());
     println!("{}", "1) Creat a server using host command");
-    println!("{}", "2) Connect to server by given IP using client command");
+    println!(
+        "{}",
+        "2) Connect to server by given IP using client command"
+    );
     println!("{}", "3) Enjoy the game :)");
     println!("");
     println!("{}", "***How to play***".bold().yellow());
-    println!("{}", "Initilally your snake randomly spawns on the playground with green head (enemys are red heads).");
+    println!(
+        "{}",
+        "Initilally your snake randomly spawns on the playground with green head (enemys are red heads)."
+    );
     println!("{}", "Snake head is 'X' and its body pieces are 'O's.");
-    println!("{}", "You see some numbers on the ground, those are foods so you can eat them.");
-    println!("{}", "You can conttol you snake by (w, s, a, d) or (up, down, right, left) arrow keys.");
-    println!("{}", "Your sanke can accelerate by pressing space on the keyboard (to decelerate press space again).");
-    println!("{}", "Be carefull, Acceleration consumes your body pieces!!".bright_red());
-    println!("{}", "To quit the game just press Esc." );
+    println!(
+        "{}",
+        "You see some numbers on the ground, those are foods so you can eat them."
+    );
+    println!(
+        "{}",
+        "You can conttol you snake by (w, s, a, d) or (up, down, right, left) arrow keys."
+    );
+    println!(
+        "{}",
+        "Your sanke can accelerate by pressing space on the keyboard (to decelerate press space again)."
+    );
+    println!(
+        "{}",
+        "Be carefull, Acceleration consumes your body pieces!!".bright_red()
+    );
+    println!("{}", "To quit the game just press Esc.");
     println!("");
 }

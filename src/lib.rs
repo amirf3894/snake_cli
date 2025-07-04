@@ -1,3 +1,3 @@
 pub mod client;
-pub mod game;
+pub mod model;
 pub mod server;

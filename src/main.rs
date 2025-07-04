@@ -1,13 +1,7 @@
-use std::{io::stdout, process::exit};
-
 use clap::{Arg, ArgMatches, Command};
-use crossterm::{
-    cursor, execute,
-    terminal::{LeaveAlternateScreen, disable_raw_mode},
-};
-use game::init::end;
-//use snake::game::snake;
-use snakecli::{self, client::user::main_client, game, server::host::main_host};
+use std::{io::stdout, process::exit};
+use colored::{self, Colorize};
+use snakecli::{client::user::main_client, server::host::main_host};
 #[tokio::main]
 async fn main() {
     let matches = Command::new("snake")
@@ -17,64 +11,57 @@ async fn main() {
                     Arg::new("ip")
                         .short('i')
                         .long("ip")
-                        .required(true)
-                        .help("An ip that server is visible for client"),
+                        .default_value("127.0.0.1:8080")
+                        .help("An ip that server is visible for client (default: 127.0.0:8080)"),
                 )
                 .arg(
                     Arg::new("height")
                         .short('H')
                         .long("height")
                         .default_value("100")
-                        .help("Playground height size which players play on it default is: 100"),
+                        .help("Playground height size which players play on it (default: 100)"),
                 )
                 .arg(
                     Arg::new("width")
                         .short('W')
                         .long("width")
                         .default_value("200")
-                        .help("Playground width size which players play on it default is: 200"),
+                        .help("Playground width size which players play on it (default: 200)"),
                 )
                 .about("Create a server that clients connect to it"),
         )
         .subcommand(
-            Command::new("client")
-                .arg(
-                    Arg::new("ip")
-                        .short('i')
-                        .long("ip")
-                        .required(true)
-                        .help("A server ip address to connect and play with others"),
-                )
-                .arg(
-                    Arg::new("name")
-                        .required(true)
-                        .help("Your username which shown in the game"),
-                )
-                .about("Connect to a server and you can play with otherse "),
+            Command::new("client").arg(
+                Arg::new("ip")
+                    .short('i')
+                    .long("ip")
+                    .default_value("127.0.0.1:8080")
+                    .help("A server ip address to connect and play with others (default: 127.0.0.1:8080"),
+            ),
         )
-        .subcommand(
-            Command::new("solo").about("Play the game lonely there is no player except you :)"),
-        )
-        .about("A cli snake game that you can play it with others")
+        .subcommand(Command::new("tutorial").about("theaches how to play and shows game options"))
         .subcommand_required(true)
+        .about("A cli snake game that you can play it with others")
+        
         .get_matches();
 
     let result = match matches.subcommand() {
         Some(("host", arg)) => host(arg).await,
-        // Some(("client", arg)) => client(arg),
-        Some(("solo", _)) => solo().await,
         Some(("client", arg)) => client(arg).await,
+        Some(("tutorial", _)) => {
+            tutorial();
+            Ok(())
+        },
         _ => exit(0),
     };
-    // disable_raw_mode().unwrap();
-
-    // execute!(stdout(), LeaveAlternateScreen, cursor::Show).unwrap();
     if let Err(e) = result {
         println!("An error occoured");
         println!("{}", e.to_string());
         exit(1);
     }
 }
+
+use snakecli::client::user::end;
 async fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
     let addr = arg.get_one::<String>("ip").unwrap();
     let width = arg.get_one::<String>("width").unwrap();
@@ -85,15 +72,33 @@ async fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
     //println!("left");
     Ok(())
 }
+
 async fn client(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
     let addr = arg.get_one::<String>("ip").unwrap();
-    let name = arg.get_one::<String>("name").unwrap();
-    let err = main_client(name, addr).await;
+    let err = main_client(addr).await;
 
     end(&err.unwrap_err().to_string(), &mut stdout())?;
     exit(0);
+    
 }
-async fn solo() -> Result<(), Box<dyn (std::error::Error)>> {
-    game::snake::main_snake().await?;
-    Ok(())
+
+fn tutorial(){
+    println!("{}", "************************".bright_purple());
+    println!("{}", "**Welcome to snake_cli**".bright_purple());
+    println!("{}", "************************".bright_purple());
+    println!("");
+    println!("{}", "***To play the game***".bold().yellow());
+    println!("{}", "1) Creat a server using host command");
+    println!("{}", "2) Connect to server by given IP using client command");
+    println!("{}", "3) Enjoy the game :)");
+    println!("");
+    println!("{}", "***How to play***".bold().yellow());
+    println!("{}", "Initilally your snake randomly spawns on the playground with green head (enemys are red heads).");
+    println!("{}", "Snake head is 'X' and its body pieces are 'O's.");
+    println!("{}", "You see some numbers on the ground, those are foods so you can eat them.");
+    println!("{}", "You can conttol you snake by (w, s, a, d) or (up, down, right, left) arrow keys.");
+    println!("{}", "Your sanke can accelerate by pressing space on the keyboard (to decelerate press space again).");
+    println!("{}", "Be carefull, Acceleration consumes your body pieces!!".bright_red());
+    println!("{}", "To quit the game just press Esc." );
+    println!("");
 }

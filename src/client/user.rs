@@ -1,33 +1,33 @@
-use crate::{
-    game::{
-        self,
-        init::{self, end},
-        model::{CommandKeys, Direction},
-    },
-    server::host::{ClientSendData, GameStatus, HostSideData},
-};
-use clap::builder::Str;
+use crate::model::*;
+use colored::{self, Colorize};
 use crossterm::{
     self,
     cursor::{self, MoveTo},
-    event::{KeyCode, KeyEvent, read},
+    event::{KeyCode, read},
     execute,
-    terminal::{Clear, ClearType, EnterAlternateScreen, enable_raw_mode, size},
+    terminal::{
+        EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode, size,
+    },
 };
 use std::{
-    io::{Write, stdout},
-    process::exit,
-    sync::{Arc, RwLock, mpsc::Sender},
+    io::{self, Stdout, Write, stdout},
+    sync::mpsc::Sender,
     thread::sleep,
     time::Duration,
 };
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt, Interest},
+    io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
-pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::error::Error)>> {
-    const FASTER_DURATION: u64 = 50;
+/*the logic of main client:
+first it spawns a function to get pressed keys and send them to a channal for main client loop
+also it reads data from Tcpstream which contains game status and a string to prilnt it on client terminal
+then send some data containing user pressed key to server both read_key and send_recieve perfoms asynchroniusly */
 
+///connects to a tcp server and reads data, shows data, sendsbadk user commans(change direction, exit, ...)
+///i game stops for any reason(loose, server errors, ...) it returns an error
+pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>> {
+    const FASTER_DURATION: u64 = 50;
     const SLOWER_DURATION: u64 = 200;
     let mut loose_weight = false;
     let mut duration = SLOWER_DURATION;
@@ -37,15 +37,9 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
     let mut stream = TcpStream::connect(addr)
         .await
         .map_err(|_| "COULDN'T CONNECT TO SERVER!")?;
-    // let data = serde_json::to_string(&ClientSendData {
-    //     terminal_size: size().unwrap(),
-    //     command: CommandKeys::None,
-    // })?;
-    //stream.write(data.as_bytes()).await?;
-    // let _ = stream.read_u8().await;
+
     let (tx, rx) = std::sync::mpsc::channel::<CommandKeys>();
     enable_raw_mode()?;
-    // let command = Arc::new(RwLock::new(CommandKeys::None));
     tokio::spawn(read_key_to_command(tx));
     let mut host_side_data = HostSideData {
         display_data: "".to_string(),
@@ -72,14 +66,6 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
             }
             loose_weight = !loose_weight;
         }
-        //print!("{:?}", command);
-        //let terminal_size = size()?;
-
-        // let command_to_send = {
-        //     let gurad = command.read().unwrap();
-        //     (*gurad).clone()
-        // };
-        // *command.write().unwrap() = CommandKeys::None;
         client_side_data = ClientSendData {
             terminal_size: size()?,
             command,
@@ -93,23 +79,22 @@ pub async fn main_client(name: &str, addr: &str) -> Result<(), Box<dyn (std::err
             .read(&mut buff)
             .await
             .map_err(|_| "COULDN't READ FROM SERVER!")?;
-        //println!("{:#?}", String::from_utf8_lossy(&buff[..len]));
         host_side_data =
             serde_json::from_str::<HostSideData>(&String::from_utf8_lossy(&buff[..len]))
                 .map_err(|_| "COULDN't READ FROM SERVER!")?;
 
         execute!(stdout, MoveTo(0, 0),)?;
         write!(stdout, "{}", host_side_data.display_data)?;
-
         stdout.flush()?;
         if let GameStatus::Dead(msg) = host_side_data.status {
-            // execute!(stdout, MoveTo((size()?.0 - 9) / 2, (size()?.1) / 2))?;
-            // println!("you loose");
             Err(msg)?;
         }
     }
     //TcpStream
 }
+
+///reads pressed keys and convert them to CommandKey and ignore boilerplate keys
+/// then send it for main_client via a channel
 async fn read_key_to_command(tx: Sender<CommandKeys>) {
     let mut previous_command = CommandKeys::None;
     loop {
@@ -132,22 +117,58 @@ async fn read_key_to_command(tx: Sender<CommandKeys>) {
                 KeyCode::Esc => CommandKeys::End,
                 _ => continue,
             }
-        }
-        // println!("pressed");
-        //stdout().flush().unwrap();
-        else {
+        } else {
             continue;
         };
 
+        //igronring repeatitive keys
         if let CommandKeys::Directions(_) = new_command {
             if new_command == previous_command {
                 continue;
             }
         }
         previous_command = new_command.clone();
-
-        tx.send(new_command).unwrap();
+        let _ = tx.send(new_command);
     }
-    // print!("command");
-    // return;
+}
+
+///after stop playing game it gets a text and show that then
+///closes alternate terminal and backs to place where user started the game
+pub fn end(text: &str, stdout: &mut Stdout) -> io::Result<()> {
+    let size = size()?;
+    let max_width = text.split('\n').max_by_key(|p| p.len()).unwrap().len() + 4;
+    let max_height = text.split('\n').count() + 2;
+    let mut showing_text = "*".repeat(max_width + 4);
+    execute!(
+        stdout,
+        MoveTo(
+            (size.0 - max_width as u16) / 2,
+            (size.1 - max_height as u16) / 2
+        )
+    )?;
+    write!(stdout, "{}", "*".repeat(max_width))?;
+
+    for (i, phrase) in text.split('\n').enumerate() {
+        execute!(
+            stdout,
+            MoveTo(
+                (size.0 - phrase.len() as u16) / 2,
+                (size.1 - max_height as u16) / 2 + 1 + i as u16
+            )
+        )?;
+        write!(stdout, "{}", phrase.bright_magenta())?;
+    }
+    execute!(
+        stdout,
+        MoveTo(
+            (size.0 - max_width as u16) / 2,
+            (size.1 + max_height as u16) / 2 - 1 as u16
+        )
+    )?;
+    write!(stdout, "{}", "*".repeat(max_width))?;
+    stdout.flush()?;
+    read()?;
+    execute!(stdout, LeaveAlternateScreen)?;
+    disable_raw_mode()?;
+    Ok(())
 }

@@ -1,27 +1,24 @@
-use std::vec;
-
 use serde::{Deserialize, Serialize};
 
-use crate::server::host::PlaygroundChanges;
-#[derive(Clone)]
+//#[derive(Clone)]
 pub struct SnakeBody {
     pub len: usize,
     pub pieces: Vec<(u16, u16)>,
     pub movement_adder: (i16, i16),
 }
-#[derive(Clone)]
+//#[derive(Clone)]
 pub struct BodyPieces {
     pub direction: Direction,
     pub coordinate: (u16, u16),
 }
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Copy)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Copy)]
 pub enum Direction {
     Up,
     Down,
     Left,
     Right,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub enum CommandKeys {
     Directions(Direction),
     EatFood,
@@ -31,14 +28,31 @@ pub enum CommandKeys {
     ChangeSpeed,
     None,
 }
-impl CommandKeys {
-    pub fn is_none(&self) -> bool {
-        if let CommandKeys::None = *self {
-            return true;
-        }
-        false
-    }
+#[derive(Clone)]
+pub struct PlaygroundChanges {
+    pub change_to_x: Vec<(u16, u16)>,
+    pub change_to_o: Vec<(u16, u16)>,
+    pub remove_char: Vec<(u16, u16)>,
+    pub add_food: Vec<((u16, u16), char)>,
 }
+#[derive(Serialize, Deserialize)]
+pub struct ClientSendData {
+    pub terminal_size: (u16, u16),
+    pub command: CommandKeys,
+    pub loose_weight: bool,
+}
+#[derive(Serialize, Deserialize)]
+pub struct HostSideData {
+    pub display_data: String,
+    pub status: GameStatus,
+    pub len: usize,
+}
+#[derive(Serialize, Deserialize)]
+pub enum GameStatus {
+    Dead(String),
+    Alive,
+}
+
 impl SnakeBody {
     pub fn change_direction(&mut self, direction: &Direction) {
         let new_movement_adder = match direction {
@@ -54,7 +68,7 @@ impl SnakeBody {
         }
         self.movement_adder = new_movement_adder;
     }
-    pub fn move_forward(&mut self) -> (Vec<(u16, u16)>, PlaygroundChanges) {
+    pub fn move_forward(&mut self) -> PlaygroundChanges {
         let &previous_head = self.pieces.get(self.len - 1).unwrap();
         let removed_tail = self.pieces.remove(0);
         let new_head = (
@@ -66,15 +80,13 @@ impl SnakeBody {
                 .unwrap_or(0),
         );
         self.pieces.push(new_head);
-        (
-            self.pieces.clone(),
-            PlaygroundChanges {
-                change_to_x: vec![new_head],
-                change_to_o: vec![previous_head],
-                remove_char: vec![removed_tail],
-                add_food: vec![],
-            },
-        )
+
+        PlaygroundChanges {
+            change_to_x: vec![new_head],
+            change_to_o: vec![previous_head],
+            remove_char: vec![removed_tail],
+            add_food: vec![],
+        }
     }
     pub fn eat_food(&mut self) {
         //let &head = self.pieces.last().unwrap();

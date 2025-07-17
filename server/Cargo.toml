@@ -1,0 +1,12 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crossterm = "0.29.0"
+local-ip-address = "0.6.5"
+rand = "0.9.1"
+serde_json = "1.0.140"
+tokio = { version = "1.46.1", features = [ "io-util", "net", "sync"] }
+common = {path = "../common"}

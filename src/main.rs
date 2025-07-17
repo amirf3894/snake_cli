@@ -1,6 +1,8 @@
 use clap::{Arg, ArgMatches, Command};
+use client::client::{end, main_client};
+
 use colored::{self, Colorize};
-use snakecli::{client::user::main_client, server::host::main_host};
+use server::host::main_host;
 use std::{io::stdout, process::exit};
 #[tokio::main]
 async fn main() {
@@ -38,7 +40,7 @@ async fn main() {
                     .help("A server ip address to connect and play with others"),
             ),
         )
-        .subcommand(Command::new("tutorial").about("theaches how to play and shows game options"))
+        .subcommand(Command::new("tutorial").about("teaches how to play and shows game options"))
         .subcommand_required(true)
         .about("A cli snake game that you can play it with others")
         .get_matches();
@@ -53,13 +55,12 @@ async fn main() {
         _ => exit(0),
     };
     if let Err(e) = result {
-        println!("An error occoured");
+        println!("An error coloured");
         println!("{}", e.to_string());
         exit(1);
     }
 }
 
-use snakecli::client::user::end;
 async fn host(arg: &ArgMatches) -> Result<(), Box<dyn (std::error::Error)>> {
     let port = arg.get_one::<String>("port").unwrap();
     let width = arg.get_one::<String>("width").unwrap();
@@ -86,7 +87,7 @@ fn tutorial() {
     println!("{}", "************************".bright_purple());
     println!("");
     println!("{}", "***To play the game***".bold().yellow());
-    println!("{}", "1) Creat a server using host command");
+    println!("{}", "1) Create a server using host command");
     println!(
         "{}",
         "2) Connect to server by given IP using client command"
@@ -96,7 +97,7 @@ fn tutorial() {
     println!("{}", "***How to play***".bold().yellow());
     println!(
         "{}",
-        "Initilally your snake randomly spawns on the playground with green head (enemys are red heads)."
+        "Initially your snake randomly spawns on the playground with green head (enemies are red heads)."
     );
     println!("{}", "Snake head is 'X' and its body pieces are 'O's.");
     println!(
@@ -105,15 +106,15 @@ fn tutorial() {
     );
     println!(
         "{}",
-        "You can conttol you snake by (w, s, a, d) or (up, down, right, left) arrow keys."
+        "You can control you snake by (w, s, a, d) or (up, down, right, left) arrow keys."
     );
     println!(
         "{}",
-        "Your sanke can accelerate by pressing space on the keyboard (to decelerate press space again)."
+        "Your snake can accelerate by pressing space on the keyboard (to decelerate press space again)."
     );
     println!(
         "{}",
-        "Be carefull, Acceleration consumes your body pieces!!".bright_red()
+        "Be careful, Acceleration consumes your body pieces!!".bright_red()
     );
     println!("{}", "To quit the game just press Esc.");
     println!("");

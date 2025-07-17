@@ -1,5 +1,5 @@
 use super::functions::*;
-use crate::model::*;
+use common::model::*;
 use local_ip_address::local_ip;
 use serde_json;
 use std::sync::{Arc, RwLock};
@@ -11,13 +11,13 @@ use tokio::{
     sync::mpsc::{Sender, channel},
 };
 /*main logic in host_side:
-first it trys to creat a tcplistener then it run a async task to wait for new clients and perform theit task
-clients send commands and host read them and if it contains some datas that affect on playground, will send
-to a channel for update_playground so it make changes on playground and then clients read playgprund data(
+first it tries to create a tcplistener then it run a async task to wait for new clients and perform their task
+clients send commands and host read them and if it contains some data that affect on playground, will send
+to a channel for update_playground so it make changes on playground and then clients read playground data(
 playground is Arc<RwLock> so all clients can read and update_playground write changes on it
 */
 
-/// creats a tcplistener to recive data from clients and if a client arrivs it spawns a special task
+/// creates a tcplistener to receive data from clients and if a client arrives it spawns a special task
 /// to handle each client
 pub async fn main_host(
     playground_size: (u16, u16),
@@ -63,8 +63,8 @@ pub async fn main_host(
                         movement_adder: (-1, 0),
                     };
 
-                    //runs client_task untill client leave, loose or an error occours
-                    let err = clinet_tasks(
+                    //runs client_task till client leave, loose or an error occurs
+                    let err = client_task(
                         &mut snake,
                         &mut host_side_data,
                         &mut playground_changes,
@@ -88,13 +88,13 @@ pub async fn main_host(
         }
     });
 
-    //each client task send PlaygroundChanges to a channel and it recives them and changes game map
+    //each client task send PlaygroundChanges to a channel and it receives them and changes game map
     update_playground(playground, rx).await;
     Ok(())
 }
 
 ///reads client data and make a string from map and send it back
-pub async fn clinet_tasks(
+pub async fn client_task(
     snake: &mut SnakeBody,
     host_side_data: &mut HostSideData,
     playground_changes: &mut PlaygroundChanges,

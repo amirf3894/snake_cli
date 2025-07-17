@@ -1,5 +1,5 @@
-use crate::model::*;
 use colored::{self, Colorize};
+use common::model::*;
 use crossterm::{
     self,
     cursor::{self, MoveTo},
@@ -20,11 +20,11 @@ use tokio::{
     net::TcpStream,
 };
 /*the logic of main client:
-first it spawns a function to get pressed keys and send them to a channal for main client loop
-also it reads data from Tcpstream which contains game status and a string to prilnt it on client terminal
-then send some data containing user pressed key to server both read_key and send_recieve perfoms asynchroniusly */
+first it spawns a function to get pressed keys and send them to a channel for main client loop
+also it reads data from Tcpstream which contains game status and a string to print it on client terminal
+then send some data containing user pressed key to server both read_key and send_receive performs asynchronously */
 
-///connects to a tcp server and reads data, shows data, sendsbadk user commans(change direction, exit, ...)
+///connects to a tcp server and reads data, shows data, sends back user commands(change direction, exit, ...)
 ///i game stops for any reason(loose, server errors, ...) it returns an error
 pub async fn main_client(addr: &str) -> Result<(), Box<dyn (std::error::Error)>> {
     const FASTER_DURATION: u64 = 50;
@@ -123,7 +123,7 @@ async fn read_key_to_command(tx: Sender<CommandKeys>) {
             continue;
         };
 
-        //igronring repeatitive keys
+        //ignoring repetitive keys
         if let CommandKeys::Directions(_) = new_command {
             if new_command == previous_command {
                 continue;

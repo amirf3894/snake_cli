@@ -1,4 +1,4 @@
-use crate::model::*;
+use common::model::*;
 use crossterm::style::Stylize;
 use rand::{random_range, rng, seq::IndexedRandom};
 use std::sync::{Arc, RwLock};
@@ -8,7 +8,7 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
 };
 
-///reads PlaygroundChanges that each spawned clinet_taks sended to channel
+///reads PlaygroundChanges that each spawned client_task sended to channel
 /// then submits them on the playground
 pub async fn update_playground(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
@@ -46,7 +46,7 @@ pub async fn update_playground(
     }
 }
 
-///This fuction happens when client can not continue the game for eny reason
+///This function happens when client can not continue the game for eny reason
 /// it removes lost snake pieces from the playground by sending a proper PlaygroundChanges
 /// to channel for update_playground function and sends the last data to client
 pub async fn loose(
@@ -91,7 +91,7 @@ pub fn add_food(playground: &mut Box<[Box<[char]>]>) -> Vec<((u16, u16), char)> 
     vec![((x as u16, y as u16), food)]
 }
 
-///this fuction put walls(#) on the playground also fills 1% of map with foods
+///this function put walls(#) on the playground also fills 1% of map with foods
 pub fn start(playground: Arc<RwLock<Box<[Box<[char]>]>>>) {
     let mut cloned_playground = {
         let guard = playground.read().unwrap();
@@ -145,7 +145,7 @@ pub fn generate_head_location(playground_size: (usize, usize)) -> (usize, usize)
 ///creates a String to sent data for client
 /// it generates string based on clients terminal size it means by changing the
 /// size of client's terminal window it wouldn't crash
-/// it is possible by a conversion_vector actually it moves the termilan cells over the map cells
+/// it is possible by a conversion_vector actually it moves the terminal cells over the map cells
 /// its formula is : terminal_cell + conversion_vector = a_cell_on_playground
 pub fn user_display_generator(
     playground: Arc<RwLock<Box<[Box<[char]>]>>>,
@@ -179,7 +179,7 @@ pub fn user_display_generator(
         conversion_vector.1 = snake_head.1.saturating_sub(terminal_size.1 - gap.1);
     }
 
-    //these are for prevent of index overflow for example maybe a moved terminal cell(converion vector + terminal cell)
+    //these are for prevent of index overflow for example maybe a moved terminal cell(conversion vector + terminal cell)
     //locates after the defined playground so we have to avoid this behavior
     if terminal_size.0 + conversion_vector.0 > playground_size.0 as u16
         || snake_head.0 + gap.0 > playground_size.0 as u16
@@ -194,13 +194,13 @@ pub fn user_display_generator(
 
     let mut data = String::new();
     let y_range = 0..if terminal_size.1 >= playground_size.1 as u16 {
-        //if client_terminal size is bigger than playgorund size
+        //if client_terminal size is bigger than playground size
         playground_size.1 as u16
     } else {
         terminal_size.1
     };
     let x_range = 0..if terminal_size.0 >= playground_size.0 as u16 {
-        //if client_terminal size is bigger than playgorund size
+        //if client_terminal size is bigger than playground size
         playground_size.0 as u16
     } else {
         terminal_size.0
@@ -229,7 +229,7 @@ pub fn user_display_generator(
             }
         });
 
-        //without this if the termial size is larger than playground size then data displayd in chaotic state in client terminal
+        //without this if the terminal size is larger than playground size then data displayed in chaotic state in client terminal
         (0..terminal_size.0.saturating_sub(playground_size.0 as u16)).for_each(|_| data.push(' '));
     });
     Ok(data)
